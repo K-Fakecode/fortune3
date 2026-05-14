@@ -180,6 +180,8 @@
     function App() {
       // 모드 선택: 'single' (개인 운세), 'couple' (궁합)
       const [viewMode, setViewMode] = useState('single');
+      // 순한맛(일반) / 매운맛(팩폭) 모드 상태 추가
+      const [readingMode, setReadingMode] = useState('normal');
 
       const [form1, setForm1] = useState({ date: '', time: '', gender: 'female', isTimeUnknown: false });
       const [form2, setForm2] = useState({ date: '', time: '', gender: 'male', isTimeUnknown: false });
@@ -308,33 +310,68 @@
           if (viewMode === 'single') {
             const tg = data1.tenGodsCount;
             
-            let generalText = `당신의 일간(고유의 본성)은 '${data1.myElement}'의 기운을 띠고 있습니다. \n\n`;
-            if (tg['비견'] + tg['겁재'] >= 3) generalText += "통계적으로 '비견/겁재'가 강하여, 주관이 매우 뚜렷하고 승부욕이 강합니다. 남의 밑에 있기보다는 독립적이거나 프리랜서, 사업에 어울리는 강인한 자아를 가졌습니다. 타인과의 타협을 배우는 것이 과제입니다.\n";
-            else if (tg['식신'] + tg['상관'] >= 3) generalText += "통계적으로 '식신/상관'이 발달하여, 표현력과 창의력이 아주 뛰어납니다. 언변이 좋고 손재주가 뛰어나 예술, 방송, 교육, 서비스업에서 재능을 크게 발휘합니다. 다재다능하지만 끈기를 기르는 것이 중요합니다.\n";
-            else if (tg['편관'] + tg['정관'] >= 3) generalText += "통계적으로 '정관/편관'이 강하게 자리 잡아, 명예와 체면, 규칙을 아주 중요하게 생각합니다. 책임감이 막중하여 조직 생활, 공직, 대기업 등에서 인정받으며 반듯한 리더십을 보여줍니다. 스트레스 관리에 주의해야 합니다.\n";
-            else if (tg['편인'] + tg['정인'] >= 3) generalText += "통계적으로 '정인/편인'의 에너지가 많아, 생각의 깊이가 남다르고 학문, 자격증, 연구 분야에 탁월합니다. 직관력이 좋고 문서운(부동산 등)이 강하며, 타인의 마음을 읽어내는 능력이 우수합니다.\n";
-            else generalText += "전반적으로 십성의 에너지가 고르게 분포되어 있어, 어떤 환경에 놓여도 원만하게 적응하는 조화로운 성품을 지녔습니다. 성격이 둥글고 대인관계가 무난하여 큰 굴곡 없는 평온한 흐름을 탑니다.\n";
+            let genN = `당신의 일간(고유의 본성)은 '${data1.myElement}'의 기운을 띠고 있습니다. \n\n`;
+            let genH = genN;
+            if (tg['비견'] + tg['겁재'] >= 3) {
+              genN += "통계적으로 '비견/겁재'가 강하여, 주관이 뚜렷하고 승부욕이 강하며 주도적으로 삶을 개척합니다.\n";
+              genH += "통계적으로 '비견/겁재'가 강하여, 주관이 뚜렷하고 승부욕이 강합니다.\n[⚠️ 팩트폭력] 고집불통에 독단적인 성격으로 주변 사람을 매우 피곤하게 만듭니다. 남의 말을 절대 듣지 않아 화를 자초하며, 특히 동업이나 돈거래를 하면 친구도 잃고 재산도 탕진하는 파재(破財)의 위험이 항시 도사리고 있습니다. 쓸데없는 자존심을 버려야 생존할 수 있습니다.\n";
+            } else if (tg['식신'] + tg['상관'] >= 3) {
+              genN += "통계적으로 '식신/상관'이 발달하여, 표현력과 창의력이 아주 뛰어나며 예술적 재능이 다분합니다.\n";
+              genH += "통계적으로 '식신/상관'이 발달하여, 표현력과 창의력이 아주 뛰어납니다.\n[⚠️ 팩트폭력] 입바른 소리나 감정 통제 실패로 구설수에 오르기 쉽고, 인간관계에서 적을 많이 만듭니다. 끈기와 인내가 심각하게 부족하여 시작만 거창하고 마무리가 안 되는 '용두사미'의 전형입니다. 즉흥적인 기분파 성향을 고치지 않으면 평생 직장 정착이 어렵습니다.\n";
+            } else if (tg['편관'] + tg['정관'] >= 3) {
+              genN += "통계적으로 '정관/편관'이 강하게 자리 잡아, 책임감이 강하고 원리원칙과 명예를 중시하는 반듯한 성품입니다.\n";
+              genH += "통계적으로 '정관/편관'이 강하게 자리 잡아, 명예와 체면, 규칙을 아주 중요하게 생각합니다.\n[⚠️ 팩트폭력] 지나친 강박증과 완벽주의로 본인과 타인의 숨통을 옥죄는 피곤한 스타일입니다. 체면 치레를 하느라 실속을 다 놓치며, 극심한 스트레스로 인한 번아웃이나 홧병, 건강 악화가 우려됩니다. 운이 나쁠 때는 관재구설(소송, 경찰서 출입)에 휘말릴 수 있으니 융통성이 절실합니다.\n";
+            } else if (tg['편인'] + tg['정인'] >= 3) {
+              genN += "통계적으로 '정인/편인'의 에너지가 많아, 생각의 깊이가 남다르고 학문과 직관력이 우수하며 배려심이 깊습니다.\n";
+              genH += "통계적으로 '정인/편인'의 에너지가 많아, 생각의 깊이가 남다르고 학문, 직관력이 우수합니다.\n[⚠️ 팩트폭력] 지나친 망상과 잡생각에 빠져 행동력이 심각하게 결여되어 있습니다. 이른바 '게으른 완벽주의자'로 실속이 전혀 없습니다. 누군가에게 의존하려는 마마보이/마마걸 기질이 있어 독립심이 부족하며, 남의 말을 의심하고 비꼬아 듣는 성격 탓에 고립될 수 있습니다.\n";
+            } else {
+              genN += "전반적으로 십성의 에너지가 고르게 분포되어 있어, 환경 적응력이 뛰어나고 무난하고 조화로운 성품을 지녔습니다.\n";
+              genH += "전반적으로 십성의 에너지가 고르게 분포되어 있어, 무난하고 조화로운 성품을 지녔습니다.\n[⚠️ 팩트폭력] 다르게 말하면 특출난 무기나 개성이 없어 이도 저도 아닌 평범하고 지루한 삶에 머물 가능성이 높습니다. 확실한 주관이나 결단력이 부족해 결정적인 기회의 순간에 남들에게 밀려 도태되거나 우유부단함으로 기회를 날릴 위험이 큽니다.\n";
+            }
 
-            let wealthText = "";
+            let welN = ""; let welH = "";
             const wealthSum = tg['편재'] + tg['정재'];
             const sikSangSum = tg['식신'] + tg['상관'];
             
-            if (wealthSum >= 2 && sikSangSum >= 1) wealthText = `사주에 재물(재성)과 그것을 만들어내는 재능(식상)이 함께 있어 '식상생재'의 훌륭한 구조를 띠고 있습니다. 자신의 기술이나 아이디어를 통해 사업적으로 큰 부를 축적할 수 있는 금전운 통계 상위 10%의 사주입니다.\n다만 돈의 스케일이 큰 만큼 지출도 크니 자산 관리에 신경 쓰세요.`;
-            else if (wealthSum >= 2) wealthText = `재물(재성)의 기운이 발달하여 돈에 대한 감각과 경제 관념이 뛰어납니다. 특히 '정재'가 강하면 월급이나 안전 자산, '편재'가 강하면 투자나 사업 자산에 인연이 깊습니다. 성실히 모으거나 타이밍을 노려 부를 쌓는 현실적인 금전운입니다.`;
-            else if (tg['편인'] + tg['정인'] >= 2) wealthText = `직접적인 현금(재성)보다는 문서(인성)를 통해 부를 축적하는 사주입니다. 현금을 쥐고 있으면 흩어지기 쉬우니, 부동산, 주식, 저작권, 자격증 등 가치가 떨어지지 않는 '문서' 형태로 묶어두는 외적인 가치 보존이 핵심입니다.`;
-            else wealthText = `사주 통계상 재물에 대한 집착이 적고 명예나 안정을 더 중시하는 '무재' 혹은 재성이 약한 구조입니다. 돈을 좇기보다는 본인의 실력과 전문성을 키우면 돈이 자연스럽게 따라오는 구조이므로, 젊은 시절의 자기 계발이 평생의 부를 결정합니다.`;
+            if (wealthSum >= 2 && sikSangSum >= 1) {
+              welN = `사업적으로 큰 부를 축적할 수 있는 '식상생재'의 훌륭한 구조입니다. 타고난 센스와 활동력으로 재물을 창출합니다.`;
+              welH = `사업적으로 큰 부를 축적할 수 있는 '식상생재'의 훌륭한 구조입니다.\n[⚠️ 금전 리스크] 하지만 돈의 스케일이 큰 만큼 '한 방'을 노리다 한순간에 파산할 위험이 극도로 높습니다. 돈 냄새를 맡고 다가오는 사기꾼들이 곁에 득실거리며, 본인 역시 투기나 도박성 투자에 빠져 빚더미에 앉을 수 있으니 철저한 분산 투자가 목숨줄입니다.`;
+            } else if (wealthSum >= 2) {
+              welN = `돈에 대한 감각과 경제 관념이 뛰어나 성실하고 안정적으로 부를 쌓아가는 현실적인 금전운입니다.`;
+              welH = `돈에 대한 감각과 경제 관념이 뛰어나 성실히 부를 쌓는 현실적인 금전운입니다.\n[⚠️ 금전 리스크] 돈의 노예가 되어 지나치게 계산적이고 이기적인 태도로 사람을 다 잃을 수 있습니다. 쥐고 있으려고만 하면 오히려 엉뚱한 곳으로 돈이 크게 새어나가는 '밑 빠진 독' 현상을 겪을 수 있습니다.`;
+            } else if (tg['편인'] + tg['정인'] >= 2) {
+              welN = `직접적인 현금보다는 문서(부동산, 자격증, 저작권 등)를 통해 자산을 지키고 불려나가는 데 유리한 사주입니다.`;
+              welH = `직접적인 현금보다는 문서(부동산, 자격증, 저작권)를 통해 부를 축적해야 하는 사주입니다.\n[⚠️ 금전 리스크] 현금이 손에 들어오면 어떻게든 탕진하거나 사기를 당할 팔자입니다. 특히 귀가 얇아 지인의 감언이설에 속아 주식 상투를 잡거나 보증을 잘못 서서 전 재산을 날릴 확률이 매우 높으니 남과 절대 돈거래를 하지 마세요.`;
+            } else {
+              welN = `재물 자체에 얽매이기보다는 본인의 전문성, 학문, 명예를 좇을 때 자연스럽게 부가 따라오는 구조입니다.`;
+              welH = `재성(재물)이 약하거나 없는 '무재' 구조로, 돈 자체보다는 전문성이나 명예를 좇아야 합니다.\n[⚠️ 금전 리스크] 평생 남들보다 돈에 쪼들리거나 금전적 성취가 떨어지는 가난한 사주가 될 수 있습니다. 주제를 모르고 허황된 일확천금을 꿈꾸며 사업이나 무리한 투자를 벌이다간 그나마 있는 자본마저 다 날리고 빚쟁이로 전락할 수 있으니 꼬박꼬박 나오는 월급에 만족해야 합니다.`;
+            }
 
-            let loveText = "";
+            let lovN = ""; let lovH = "";
             if (form1.gender === 'female') {
                const gwanSum = tg['편관'] + tg['정관'];
-               if (gwanSum >= 2) loveText = `여성의 사주에서 남자를 뜻하는 관성(정관/편관)이 잘 자리 잡고 있습니다. 주변에 본인을 호위하거나 지켜주려는 이성들이 많으며, 반듯하고 책임감 있는 배우자를 만나 안정적인 가정을 꾸릴 확률이 통계적으로 매우 높습니다.`;
-               else if (gwanSum === 0) loveText = `관성(남자)의 얽매임보다는 본인의 커리어와 자유를 더 중요시하는 독립적인 성향입니다. 일찍 결혼하기보다는 충분히 자신의 삶을 즐긴 후, 가치관이 통하는 친구 같은 사람과 늦게 만나는 '만혼'이 유리합니다.`;
-               else loveText = `자연스럽고 편안한 인연이 적절한 시기에 찾아오는 무난한 연애운입니다. 너무 화려한 만남보다는 일상이나 직장 내에서 자연스럽게 스며드는 인연을 소중히 여기세요.`;
+               if (gwanSum >= 2) {
+                 lovN = `주변에 이성이 많고 반듯한 배우자를 만날 확률이 높습니다. 안정적이고 책임감 있는 사람과 인연이 깊습니다.`;
+                 lovH = `주변에 이성이 많고 반듯한 배우자를 만날 확률이 높은 구조입니다.\n[💔 치명적 연애사] 그러나 '남자 복이 많다'는 것은 반대로 '나쁜 남자, 똥차'도 그만큼 많이 꼬인다는 뜻입니다. 남편에게 심하게 억눌리거나 가부장적, 혹은 폭력적인 성향의 배우자를 만나 눈물짓고 마음고생을 심하게 할 수 있는 '이혼수'가 다분합니다.`;
+               } else if (gwanSum === 0) {
+                 lovN = `이성에게 얽매이기보다 본인의 커리어와 자유를 더 중요시하는 독립적인 성향입니다. 늦게 인연을 맺는 만혼이 유리합니다.`;
+                 lovH = `본인의 커리어와 자유를 더 중요시하는 독립적인 성향입니다.\n[💔 치명적 연애사] 남자 보는 눈이 절망적인 수준으로 없거나, 반대로 이성에게 인기가 없어 평생 지독한 외로움을 탈 수 있습니다. 섣불리 외로움에 타협해 일찍 결혼하면 반드시 후회하고 갈라서게 되니 비혼이나 늦은 만혼만이 살 길입니다.`;
+               } else {
+                 lovN = `편안한 인연이 적절한 시기에 찾아오는 무난한 연애운입니다. 평온한 가정을 꾸리기에 좋습니다.`;
+                 lovH = `편안한 인연이 적절한 시기에 찾아오는 무난한 연애운입니다.\n[💔 치명적 연애사] 무난함이 지나쳐 매번 지루하고 권태로운 연애/결혼 생활이 이어집니다. 이로 인해 밖에서 자극적이고 위험한 매력을 가진 이성에게 쉽게 흔들려 바람이 날 수 있는 치명적인 약점이 있습니다.`;
+               }
             } else {
                const jaeSum = tg['편재'] + tg['정재'];
-               if (jaeSum >= 2) loveText = `남성의 사주에서 여자를 뜻하는 재성(정재/편재)이 풍부합니다. 이성을 대하는 매너가 좋고 센스가 있어 인기가 많습니다. 다양한 만남의 기회가 주어지나, 한 사람에게 진득하게 정착하는 안목을 기르는 것이 평탄한 결혼 생활의 핵심입니다.`;
-               else if (jaeSum === 0) loveText = `연애 스킬이나 이벤트보다는 진정성과 묵직함으로 승부하는 타입입니다. 연애에 다소 서툴거나 무심해 보일 수 있으나, 한 번 인연을 맺으면 변함없이 상대를 지키려는 책임감이 매우 강합니다.`;
-               else loveText = `자연스럽고 편안한 인연이 적절한 시기에 찾아오는 무난한 연애운입니다. 너무 화려한 만남보다는 일상이나 직장 내에서 자연스럽게 스며드는 인연을 소중히 여기세요.`;
+               if (jaeSum >= 2) {
+                 lovN = `여자를 다루는 센스가 있고 만남의 기회가 많아 인기가 있습니다. 좋은 인연을 통해 행복한 가정을 꾸릴 수 있습니다.`;
+                 lovH = `여자를 다루는 센스가 있고 만남의 기회가 많아 인기가 있는 사주입니다.\n[💔 치명적 연애사] 최악의 경우 심각한 여성 편력과 바람기로 인해 가정이 산산조각 날 수 있습니다. 여자 문제로 인한 패가망신, 이혼 소송, 혹은 유흥에 빠져 재산과 명예를 모두 잃는 끔찍한 결말을 피하려면 성욕과 충동을 억제해야 합니다.`;
+               } else if (jaeSum === 0) {
+                 lovN = `잔재주보다는 진정성과 묵직함으로 승부하는 뚝심 있는 타입입니다. 한 사람만 바라보는 순애보적 사랑을 합니다.`;
+                 lovH = `진정성과 묵직함으로 승부하는 뚝심 있는 타입입니다.\n[💔 치명적 연애사] 여자의 마음을 전혀 읽지 못하는 심각한 눈치코치 제로의 '모태솔로' 혹은 '독거남' 기질이 다분합니다. 융통성이 없고 재미가 없어 연애가 오래가지 못하며, 결혼하더라도 대화가 단절된 쇼윈도 부부로 전락할 위험이 큽니다.`;
+               } else {
+                 lovN = `편안한 인연이 적절한 시기에 찾아오는 무난한 연애운입니다. 평온하고 흔들림 없는 만남을 이어갑니다.`;
+                 lovH = `편안한 인연이 적절한 시기에 찾아오는 무난한 연애운입니다.\n[💔 치명적 연애사] 무난함이 지나쳐 매번 지루하고 권태로운 연애/결혼 생활이 이어집니다. 이로 인해 밖에서 자극적이고 위험한 매력을 가진 이성에게 쉽게 흔들려 바람이 날 수 있는 치명적인 약점이 있습니다.`;
+               }
             }
 
             let weakElements = Object.keys(data1.elementsCount).filter(e => data1.elementsCount[e] === 0);
@@ -342,14 +379,22 @@
               const minCount = Math.min(...Object.values(data1.elementsCount));
               weakElements = Object.keys(data1.elementsCount).filter(e => data1.elementsCount[e] === minCount);
             }
-            const healthTips = {
-              "목": "간과 담낭, 피로 회복 능력이 약할 수 있습니다. 잦은 음주를 피하고 충분한 수면을 취하세요.",
-              "화": "심장, 소장, 혈액순환 계통 관리에 신경 쓰세요. 걷기 등 유산소 운동이 필수입니다.",
-              "토": "위장 등 소화기관이 예민합니다. 스트레스성 폭식을 피하고 규칙적인 식습관을 가져야 합니다.",
-              "금": "폐, 대장, 호흡기가 다소 약한 편입니다. 환절기 감기에 취약하니 호흡기 관리에 유의하세요.",
-              "수": "신장, 방광, 생식기 쪽 에너지가 고갈되기 쉽습니다. 수분을 충분히 섭취하고 스트레스를 줄이세요."
+            const healthTipsN = {
+              "목": "간과 담낭 기능이 다소 피로할 수 있으니 충분한 수면과 휴식을 취하세요.",
+              "화": "심장과 혈액순환에 유의하며 긍정적인 마음가짐을 갖는 것이 중요합니다.",
+              "토": "소화기관이 예민할 수 있으니 규칙적인 식습관과 편안한 식사 시간을 유지하세요.",
+              "금": "호흡기나 기관지가 약해질 수 있으니 맑은 공기를 마시고 환절기 감기에 주의하세요.",
+              "수": "신장과 방광, 체력 관리에 신경 쓰며 물을 자주 마시는 것이 좋습니다."
             };
-            const healthText = `통계적으로 '${weakElements.join(', ')}'의 기운이 가장 억눌려 있습니다.\n해당 장부의 밸런스가 무너지기 쉬우니 주의하세요. ${weakElements.map(e => healthTips[e]).join(' ')}`;
+            const healthTipsH = {
+              "목": "간암, 간경화, 담석증, 중풍, 디스크 파열. 술을 입에 대는 순간 수명을 깎아먹는 것입니다.",
+              "화": "심근경색, 협심증, 뇌출혈, 시력 상실, 심각한 우울증 및 공황장애. 갑작스러운 돌연사를 가장 조심해야 합니다.",
+              "토": "위암, 췌장암, 심각한 위궤양, 당뇨병. 스트레스성 폭식으로 인해 장기가 서서히 썩어 들어갈 수 있습니다.",
+              "금": "폐암, 대장암, 심각한 천식 및 치질, 피부병. 담배는 당신에게 즉각적인 독약입니다.",
+              "수": "신장 투석, 방광암, 전립선/자궁 관련 중증 질환, 불임. 체력 고갈이 심각해 만성 피로에 시달릴 수 있습니다."
+            };
+            const heaN = `통계적으로 '${weakElements.join(', ')}'의 기운이 다소 억눌려 있습니다. 해당 장부의 밸런스에 신경 쓰시면 건강을 잘 유지할 수 있습니다:\n${weakElements.map(e => "👉 " + healthTipsN[e]).join('\n')}`;
+            const heaH = `통계적으로 '${weakElements.join(', ')}'의 기운이 씨가 말랐거나 가장 억눌려 있습니다.\n[⚠️ 질병 경고] 해당 오행이 뜻하는 장부가 완전히 망가질 징조를 안고 태어났습니다. 다음의 질환에 취약하니 오늘 당장 병원 검진을 예약하세요:\n${weakElements.map(e => "👉 " + healthTipsH[e]).join('\n')}`;
 
             const now = new Date();
             const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
@@ -402,7 +447,12 @@
             setResult({
               type: 'single', data: data1, timing: luckTiming,
               today: { date: `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일`, stem: todayStem, branch: todayBranch, fortune: todayFortune },
-              readings: { general: generalText, wealth: wealthText, love: loveText, health: healthText }
+              readings: { 
+                general: { normal: genN, harsh: genH }, 
+                wealth: { normal: welN, harsh: welH }, 
+                love: { normal: lovN, harsh: lovH }, 
+                health: { normal: heaN, harsh: heaH } 
+              }
             });
 
           } else {
@@ -443,14 +493,22 @@
             if (score > 100) score = 100;
             if (score < 40) score = Math.floor(Math.random() * 15) + 40; 
 
-            let overallText = "";
-            if (score >= 85) overallText = "두 분의 인연은 하늘이 맺어준 것처럼 깊고 아름답습니다. 서로에게 큰 힘이 되어주는 최고의 궁합입니다.";
-            else if (score >= 70) overallText = "서로 다름을 인정하고 조금만 양보한다면 오랫동안 좋은 관계를 유지할 수 있는 긍정적인 궁합입니다.";
-            else overallText = "가치관의 차이나 성향의 충돌이 있을 수 있습니다. 사랑과 배려로 차이를 극복하려는 노력이 필요합니다.";
+            let overN = ""; let overH = "";
+            if (score >= 85) {
+               overN = overH = "두 분의 인연은 하늘이 맺어준 것처럼 깊고 아름답습니다. 서로에게 큰 힘이 되어주는 최고의 궁합입니다.";
+            } else if (score >= 70) {
+               overN = overH = "서로 다름을 인정하고 조금만 양보한다면 오랫동안 좋은 관계를 유지할 수 있는 무난하고 긍정적인 궁합입니다.";
+            } else if (score >= 55) {
+               overN = "가치관의 차이나 성향의 충돌이 자주 발생합니다. 서로 인내와 배려로 극복하며 맞춰가야 하는 관계입니다.";
+               overH = "가치관의 차이나 성향의 충돌이 자주 발생합니다. 서로 사랑보다는 인내와 희생으로 극복해야 하는 피곤한 관계입니다.";
+            } else {
+               overN = "가치관의 차이로 인해 자주 부딪힐 수 있습니다. 서로의 입장을 깊이 이해하고 양보하려는 큰 노력이 필요합니다.";
+               overH = "[⚠️ 위험 경고] 서로의 기운을 심각하게 갉아먹는 악연(惡緣)의 소지가 다분합니다. 같이 있을수록 밑바닥을 보게 되며, 잦은 다툼과 상처만 남기고 파국을 맞이할 확률이 통계적으로 매우 높습니다. 진지하게 관계를 재고해 볼 필요가 있습니다.";
+            }
 
             setResult({
               type: 'couple', data1: data1, data2: data2, score: score,
-              readings: { relation: relationText, complement: complementText, overall: overallText }
+              readings: { relation: relationText, complement: complementText, overall: { normal: overN, harsh: overH } }
             });
           }
 
@@ -466,6 +524,24 @@
               <div className="inline-flex items-center justify-center p-3 bg-amber-500/20 rounded-full mb-4 text-3xl">✨</div>
               <h1 className="text-3xl md:text-4xl font-bold text-amber-400">사주 만세력 & 종합 운세</h1>
               <p className="text-slate-400">명리학 십성(육친) 통계 기반 정통 풀이. 숫자만 입력하세요.</p>
+            </div>
+
+            {/* 순한맛/매운맛 토글 버튼 (추가됨) */}
+            <div className="flex justify-center mb-2">
+              <div className="bg-slate-800 p-1 rounded-full inline-flex shadow-xl border border-slate-700">
+                <button 
+                  onClick={() => setReadingMode('normal')}
+                  className={`px-6 py-2 text-sm font-bold rounded-full transition-all ${readingMode === 'normal' ? 'bg-emerald-500 text-slate-900 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  🌿 순한맛 (일반)
+                </button>
+                <button 
+                  onClick={() => setReadingMode('harsh')}
+                  className={`px-6 py-2 text-sm font-bold rounded-full transition-all ${readingMode === 'harsh' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  🔥 매운맛 (팩폭)
+                </button>
+              </div>
             </div>
 
             <div className="flex bg-slate-800 p-1 rounded-xl w-full max-w-sm mx-auto shadow-lg border border-slate-700">
@@ -660,60 +736,64 @@
                     <div className="space-y-6">
                       {result.data.shinsal.map((s, idx) => (
                         <div key={idx} className="bg-slate-700/30 p-5 rounded-xl border border-slate-600/50">
-                          <div className="flex items-center gap-3 mb-3">
-                            <span className={`px-3 py-1 text-sm font-bold rounded-md ${
-                              s.type === 'warning' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 
-                              s.type === 'good' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 
-                              'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                            }`}>
-                              {s.name}
-                            </span>
-                          </div>
-                          <p className="text-slate-200 leading-relaxed mb-3">{s.desc}</p>
-                          <div className="bg-rose-950/40 p-4 rounded-lg border-l-4 border-rose-500">
-                            <p className="text-sm text-rose-200 flex items-start gap-2">
-                              <span className="mt-0.5">⚠️</span> 
-                              <span><strong>조심해야 할 것:</strong> {s.caution}</span>
-                            </p>
-                          </div>
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className={`px-3 py-1 text-sm font-bold rounded-md ${
+                          s.type === 'warning' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 
+                          s.type === 'good' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 
+                          'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                        }`}>
+                          {s.name}
+                        </span>
+                      </div>
+                      <p className="text-slate-200 leading-relaxed mb-3">{s.desc}</p>
+                      
+                      {/* 팩폭 모드일 때만 치명적인 단점/주의점 표시 */}
+                      {readingMode === 'harsh' && (
+                        <div className="bg-rose-950/40 p-4 rounded-lg border-l-4 border-rose-500 fade-in">
+                          <p className="text-sm text-rose-200 flex items-start gap-2">
+                            <span className="mt-0.5">⚠️</span> 
+                            <span><strong>팩폭 경고:</strong> {s.caution}</span>
+                          </p>
                         </div>
-                      ))}
+                      )}
                     </div>
-                  </div>
-                )}
-
-                <div className="space-y-6">
-                  <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
-                    <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>✨</span> 십성 통계 기반: 타고난 성향과 직업</h3>
-                    <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.general}</p>
-                  </div>
-                  <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
-                    <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>💰</span> 십성 통계 기반: 금전운과 재산 관리법</h3>
-                    <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.wealth}</p>
-                  </div>
-                  <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
-                    <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>💖</span> 십성 통계 기반: 연애운과 인연의 흐름</h3>
-                    <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.love}</p>
-                  </div>
-                  <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
-                    <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>💪</span> 오행 통계 기반: 건강 및 체질 관리</h3>
-                    <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.health}</p>
-                  </div>
+                  ))}
                 </div>
-
               </div>
             )}
 
-            {result && result.type === 'couple' && (
-              <div className="space-y-8 fade-in">
-                
-                <div className="bg-gradient-to-r from-pink-900/40 to-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-pink-700/50 text-center">
-                  <h2 className="text-2xl font-bold text-pink-400 mb-2">명리학 궁합 종합 점수</h2>
-                  <div className="text-6xl md:text-7xl font-black text-white my-6 drop-shadow-lg">{result.score}<span className="text-3xl text-pink-300 ml-2">점</span></div>
-                  <p className="text-lg md:text-xl text-slate-200 leading-relaxed max-w-2xl mx-auto">{result.readings.overall}</p>
-                </div>
+            <div className="space-y-6">
+              <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
+                <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>✨</span> 십성 통계 기반: 타고난 성향과 직업</h3>
+                <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.general[readingMode]}</p>
+              </div>
+              <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
+                <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>💰</span> 십성 통계 기반: 금전운과 재산 관리법</h3>
+                <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.wealth[readingMode]}</p>
+              </div>
+              <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
+                <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>💖</span> 십성 통계 기반: 연애운과 인연의 흐름</h3>
+                <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.love[readingMode]}</p>
+              </div>
+              <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
+                <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>💪</span> 오행 통계 기반: 건강 및 체질 관리</h3>
+                <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.health[readingMode]}</p>
+              </div>
+            </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          </div>
+        )}
+
+        {result && result.type === 'couple' && (
+          <div className="space-y-8 fade-in">
+            
+            <div className="bg-gradient-to-r from-pink-900/40 to-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-pink-700/50 text-center">
+              <h2 className="text-2xl font-bold text-pink-400 mb-2">명리학 궁합 종합 점수</h2>
+              <div className="text-6xl md:text-7xl font-black text-white my-6 drop-shadow-lg">{result.score}<span className="text-3xl text-pink-300 ml-2">점</span></div>
+              <p className="text-lg md:text-xl text-slate-200 leading-relaxed max-w-2xl mx-auto">{result.readings.overall[readingMode]}</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
                     <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>☯️</span> 일간(본성) 조화 궁합</h3>
                     <p className="text-slate-300 leading-loose text-justify">{result.readings.relation}</p>
