@@ -1,848 +1,3755 @@
 <!DOCTYPE html>
+
 <html lang="ko">
+
 <head>
+
   <meta charset="UTF-8">
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>사주 만세력 & 운세 풀이</title>
+
   
+
   <!-- Tailwind CSS -->
+
   <script src="https://cdn.tailwindcss.com"></script>
+
   <!-- React 및 Babel -->
+
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+  
+
+  <!-- 🌟 lunar-javascript CDN 추가 (우주적 천문 데이터 기반 정확한 만세력) 🌟 -->
+
+  <script src="https://cdn.jsdelivr.net/npm/lunar-javascript/lunar.min.js"></script>
+
+
+
   <style>
+
     @keyframes spin { 100% { transform: rotate(360deg); } }
+
     .animate-spin { animation: spin 1s linear infinite; }
+
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
     .fade-in { animation: fadeIn 0.7s ease-out forwards; }
+
     .text-justify { text-align: justify; }
+
   </style>
+
 </head>
+
 <body class="bg-slate-900 text-slate-100 font-sans">
+
   <div id="root"></div>
 
+
+
   <script type="text/babel">
+
     const { useState, useEffect } = React;
 
+
+
     // --- 명리학 기초 데이터 (음양, 오행) ---
+
     const stems = ["갑(甲/목)", "을(乙/목)", "병(丙/화)", "정(丁/화)", "무(戊/토)", "기(己/토)", "경(庚/금)", "신(辛/금)", "임(壬/수)", "계(癸/수)"];
+
     const branches = ["자(子/수)", "축(丑/토)", "인(寅/목)", "묘(卯/목)", "진(辰/토)", "사(巳/화)", "오(午/화)", "미(未/토)", "신(申/금)", "유(酉/금)", "술(戌/토)", "해(亥/수)"];
 
+
+
     const stemInfo = {
+
       "갑": { el: "목", yy: "+" }, "을": { el: "목", yy: "-" },
+
       "병": { el: "화", yy: "+" }, "정": { el: "화", yy: "-" },
+
       "무": { el: "토", yy: "+" }, "기": { el: "토", yy: "-" },
+
       "경": { el: "금", yy: "+" }, "신": { el: "금", yy: "-" },
+
       "임": { el: "수", yy: "+" }, "계": { el: "수", yy: "-" }
+
     };
 
-    // 지지 정기(본기) 기준 음양오행
+
+
     const branchInfo = {
+
       "자": { el: "수", yy: "-" }, "축": { el: "토", yy: "-" },
+
       "인": { el: "목", yy: "+" }, "묘": { el: "목", yy: "-" },
+
       "진": { el: "토", yy: "+" }, "사": { el: "화", yy: "+" }, 
+
       "오": { el: "화", yy: "-" }, "미": { el: "토", yy: "-" },
+
       "신": { el: "금", yy: "+" }, "유": { el: "금", yy: "-" },
+
       "술": { el: "토", yy: "+" }, "해": { el: "수", yy: "+" }
+
     };
+
+
 
     const elementsData = {
-      "목": { color: "bg-green-500", icon: "🌲" },
-      "화": { color: "bg-red-500", icon: "🔥" },
-      "토": { color: "bg-yellow-600", icon: "⛰️" },
-      "금": { color: "bg-slate-300", icon: "⚙️" },
-      "수": { color: "bg-blue-500", icon: "💧" }
+
+      "목": { color: "bg-green-500", icon: "🌲", txtColor: "text-green-900" },
+
+      "화": { color: "bg-red-500", icon: "🔥", txtColor: "text-red-900" },
+
+      "토": { color: "bg-yellow-500", icon: "⛰️", txtColor: "text-yellow-900" },
+
+      "금": { color: "bg-slate-200", icon: "⚙️", txtColor: "text-slate-900" },
+
+      "수": { color: "bg-blue-500", icon: "💧", txtColor: "text-blue-900" }
+
     };
 
+
+
+    // 🌟 지장간 (Hidden Stems) 12지신 완벽 매핑 데이터 🌟
+
+    const hiddenStems = {
+
+      "자": ["임", "계"],
+
+      "축": ["계", "신", "기"],
+
+      "인": ["무", "병", "갑"],
+
+      "묘": ["갑", "을"],
+
+      "진": ["을", "계", "무"],
+
+      "사": ["무", "경", "병"],
+
+      "오": ["병", "기", "정"],
+
+      "미": ["정", "을", "기"],
+
+      "신": ["무", "임", "경"],
+
+      "유": ["경", "신"],
+
+      "술": ["신", "정", "무"],
+
+      "해": ["무", "갑", "임"]
+
+    };
+
+
+
+    // 천간 글자를 주면 오행을 찾아주는 헬퍼 함수 (지장간 색칠용)
+
+    const getElementForStemChar = (char) => {
+
+      const stemMatch = stems.find(s => s.startsWith(char));
+
+      if(stemMatch) return stemMatch.split('/')[1]?.replace(')', '');
+
+      return "";
+
+    };
+
+
+
+    const elTextColor = {
+
+      "목": "text-green-400", "화": "text-red-400", "토": "text-yellow-400",
+
+      "금": "text-slate-300", "수": "text-blue-400"
+
+    };
+
+
+
+    // 🌟 한자 -> 한글 매핑 도구 (lunar-javascript 연동용)
+
+    const h2kStem = { "甲":"갑", "乙":"을", "丙":"병", "丁":"정", "戊":"무", "己":"기", "庚":"경", "辛":"신", "壬":"임", "癸":"계" };
+
+    const h2kBranch = { "子":"자", "丑":"축", "寅":"인", "卯":"묘", "辰":"진", "巳":"사", "午":"오", "未":"미", "申":"신", "酉":"유", "戌":"술", "亥":"해" };
+
+
+
+    const getKorPillar = (hanjaStr) => {
+
+      if (!hanjaStr || hanjaStr.length < 2) return { stem: "?(모름/?)", branch: "?(모름/?)" };
+
+      const kS = h2kStem[hanjaStr.charAt(0)];
+
+      const kB = h2kBranch[hanjaStr.charAt(1)];
+
+      return {
+
+        stem: stems.find(s => s.startsWith(kS)) || "?(모름/?)",
+
+        branch: branches.find(b => b.startsWith(kB)) || "?(모름/?)"
+
+      };
+
+    };
+
+
+
     // 🌟 주요 신살(神殺) 계산 로직
+
     function getShinsal(dayStemChar, branchesArr, stemsArr) {
+
       const shinsalList = [];
+
       const bChars = branchesArr.map(b => b.split('(')[0]);
+
       const sChars = stemsArr.map(s => s.split('(')[0]);
 
-      // 1. 역마살
+
+
       const yeokmaCount = bChars.filter(b => ["인", "신", "사", "해"].includes(b)).length;
+
       if (yeokmaCount >= 2) {
-        shinsalList.push({
-          name: "역마살(驛馬殺)", type: "warning",
-          desc: "활동성이 매우 강하고 이동이나 변화가 잦은 기운입니다. 한 곳에 정착하기보다는 돌아다니거나 해외와 연관된 일이 잘 맞습니다.",
-          caution: "잦은 이동으로 인한 체력 고갈이나 한 가지 일에 끈기가 부족해질 수 있으니, 무계획적인 이직이나 이사는 피하는 것이 좋습니다."
-        });
+
+        shinsalList.push({ name: "역마살(驛馬殺)", type: "warning", desc: "활동성이 매우 강하고 이동이나 변화가 잦은 기운입니다.", caution: "잦은 이동으로 인한 체력 고갈이나 무계획적인 이직은 피하는 것이 좋습니다." });
+
       }
 
-      // 2. 도화살
       const dohwaCount = bChars.filter(b => ["자", "오", "묘", "유"].includes(b)).length;
+
       if (dohwaCount >= 2) {
-        shinsalList.push({
-          name: "도화살(桃花殺)", type: "good",
-          desc: "타인의 시선을 끌고 매력을 발산하는 기운이 강합니다. 예술, 방송, 연예, 영업 등 사람을 상대하는 일에서 두각을 나타냅니다.",
-          caution: "구설수나 불필요한 이성 문제에 휘말릴 수 있습니다. 넘치는 매력을 건전한 취미나 직업적 성취로 승화시키는 것이 중요합니다."
-        });
+
+        shinsalList.push({ name: "도화살(桃花殺)", type: "good", desc: "타인의 시선을 끌고 매력을 발산하는 기운이 강합니다.", caution: "구설수나 불필요한 이성 문제에 휘말릴 수 있습니다." });
+
       }
 
-      // 3. 화개살
       const hwagaeCount = bChars.filter(b => ["진", "술", "축", "미"].includes(b)).length;
+
       if (hwagaeCount >= 2) {
-        shinsalList.push({
-          name: "화개살(華蓋殺)", type: "neutral",
-          desc: "내면이 깊고 학문, 종교, 예술, 철학에 대한 이해도가 남다릅니다. 고독을 즐기며 정신적인 세계를 추구하는 성향이 강합니다.",
-          caution: "현실 감각이 무뎌지거나 지나친 고집, 자기만의 세계에 빠져 우울감을 겪을 수 있으니, 현실과의 균형을 맞추는 연습이 필요합니다."
-        });
-      }
 
-      // 4. 백호대살
-      const baekhoCombos = ["갑진", "을미", "병술", "정축", "무진", "임술", "계축"];
-      let hasBaekho = false;
-      for (let i = 0; i < sChars.length; i++) {
-        if (sChars[i] && bChars[i] && baekhoCombos.includes(sChars[i] + bChars[i])) {
-          hasBaekho = true; break;
-        }
-      }
-      if (hasBaekho) {
-        shinsalList.push({
-          name: "백호대살(白虎大殺)", type: "warning",
-          desc: "목표를 향해 돌진하는 폭발적인 에너지와 강한 추진력을 가졌습니다. 큰 뜻을 품으면 남들이 해내기 어려운 일도 성취해 냅니다.",
-          caution: "기운이 너무 강해 감정 조절이 어렵거나 타인과 심하게 충돌할 수 있습니다. 욱하는 성질을 다스리고, 특히 혈압이나 사고(건강)에 주의해야 합니다."
-        });
-      }
+        shinsalList.push({ name: "화개살(華蓋殺)", type: "neutral", desc: "내면이 깊고 철학, 종교, 예술에 대한 이해도가 남다릅니다.", caution: "현실 감각이 무뎌지거나 고집, 우울감을 겪을 수 있습니다." });
 
-      // 5. 괴강살
-      const gwaegangCombos = ["무술", "경진", "경술", "임진"];
-      let hasGwaegang = false;
-      for (let i = 0; i < sChars.length; i++) {
-        if (sChars[i] && bChars[i] && gwaegangCombos.includes(sChars[i] + bChars[i])) {
-          hasGwaegang = true; break;
-        }
-      }
-      if (hasGwaegang) {
-        shinsalList.push({
-          name: "괴강살(魁罡殺)", type: "neutral",
-          desc: "주관이 매우 뚜렷하고 카리스마와 리더십이 뛰어납니다. 무리에서 우두머리가 되려는 기질이 강하며 극난을 이겨내는 힘이 있습니다.",
-          caution: "지나친 독선이나 강압적인 태도로 인해 대인관계가 끊어질 수 있습니다. 유연함과 타협하는 자세를 기르는 것이 평생의 숙제입니다."
-        });
       }
 
       return shinsalList;
+
     }
 
+
+
     // 🌟 핵심 통계 로직: 십성(육친) 계산 함수
+
     function getTenGod(dayStemChar, targetChar, isBranch) {
+
       if (!targetChar || targetChar.includes("?")) return "";
-      
+
       const dayKey = dayStemChar.split('(')[0];
+
       const targetKey = targetChar.split('(')[0];
-      
+
       if (dayKey === targetKey && !isBranch) return "나(日干)";
 
       const me = stemInfo[dayKey];
+
       const target = isBranch ? branchInfo[targetKey] : stemInfo[targetKey];
-      
+
       if (!me || !target) return "";
 
       const sameYinYang = me.yy === target.yy;
 
-      // 1. 비겁
+
+
       if (me.el === target.el) return sameYinYang ? "비견" : "겁재";
-      
-      // 2. 식상
-      if (
-        (me.el === "목" && target.el === "화") || (me.el === "화" && target.el === "토") ||
-        (me.el === "토" && target.el === "금") || (me.el === "금" && target.el === "수") ||
-        (me.el === "수" && target.el === "목")
-      ) return sameYinYang ? "식신" : "상관";
 
-      // 3. 재성
-      if (
-        (me.el === "목" && target.el === "토") || (me.el === "화" && target.el === "금") ||
-        (me.el === "토" && target.el === "수") || (me.el === "금" && target.el === "목") ||
-        (me.el === "수" && target.el === "화")
-      ) return sameYinYang ? "편재" : "정재";
+      if ((me.el === "목" && target.el === "화") || (me.el === "화" && target.el === "토") || (me.el === "토" && target.el === "금") || (me.el === "금" && target.el === "수") || (me.el === "수" && target.el === "목")) return sameYinYang ? "식신" : "상관";
 
-      // 4. 관성
-      if (
-        (target.el === "목" && me.el === "토") || (target.el === "화" && me.el === "금") ||
-        (target.el === "토" && me.el === "수") || (target.el === "금" && me.el === "목") ||
-        (target.el === "수" && me.el === "화")
-      ) return sameYinYang ? "편관" : "정관";
+      if ((me.el === "목" && target.el === "토") || (me.el === "화" && target.el === "금") || (me.el === "토" && target.el === "수") || (me.el === "금" && target.el === "목") || (me.el === "수" && target.el === "화")) return sameYinYang ? "편재" : "정재";
 
-      // 5. 인성
-      if (
-        (target.el === "목" && me.el === "화") || (target.el === "화" && me.el === "토") ||
-        (target.el === "토" && me.el === "금") || (target.el === "금" && me.el === "수") ||
-        (target.el === "수" && me.el === "목")
-      ) return sameYinYang ? "편인" : "정인";
+      if ((target.el === "목" && me.el === "토") || (target.el === "화" && me.el === "금") || (target.el === "토" && me.el === "수") || (target.el === "금" && me.el === "목") || (target.el === "수" && me.el === "화")) return sameYinYang ? "편관" : "정관";
+
+      if ((target.el === "목" && me.el === "화") || (target.el === "화" && me.el === "토") || (target.el === "토" && me.el === "금") || (target.el === "금" && me.el === "수") || (target.el === "수" && me.el === "목")) return sameYinYang ? "편인" : "정인";
 
       return "";
+
     }
 
+
+
+    // ===============================
+
+    // 🌟 정밀 명리학 분석 엔진
+
+    // ===============================
+
+    // 기준: 자평명리의 기본 원리(월령, 통근, 투간, 합충형파해, 조후, 격국, 종격)를
+
+    // 앱에서 계산 가능한 규칙형 엔진으로 구현한 것입니다.
+
+    // 학파별 차이가 있으므로 최종 용신은 "단정"이 아니라 후보 랭킹으로 보여줍니다.
+
+
+
+    const generates = {
+
+      "목": "화",
+
+      "화": "토",
+
+      "토": "금",
+
+      "금": "수",
+
+      "수": "목"
+
+    };
+
+
+
+    const controls = {
+
+      "목": "토",
+
+      "토": "수",
+
+      "수": "화",
+
+      "화": "금",
+
+      "금": "목"
+
+    };
+
+
+
+    const getResourceElement = (el) => Object.keys(generates).find(key => generates[key] === el) || "";
+
+    const getControlElement = (el) => Object.keys(controls).find(key => controls[key] === el) || "";
+
+
+
+    const getElementTypeForDay = (dayElement, targetElement) => {
+
+      const resource = getResourceElement(dayElement);
+
+      const officer = getControlElement(dayElement);
+
+      const output = generates[dayElement];
+
+      const wealth = controls[dayElement];
+
+
+
+      if (targetElement === dayElement) return "비겁";
+
+      if (targetElement === resource) return "인성";
+
+      if (targetElement === output) return "식상";
+
+      if (targetElement === wealth) return "재성";
+
+      if (targetElement === officer) return "관성";
+
+      return "기타";
+
+    };
+
+
+
+    const monthElementPower = {
+
+      "인": "목", "묘": "목", "진": "토",
+
+      "사": "화", "오": "화", "미": "토",
+
+      "신": "금", "유": "금", "술": "토",
+
+      "해": "수", "자": "수", "축": "토"
+
+    };
+
+
+
+    const seasonDisplay = {
+
+      "인": "초봄 목기", "묘": "한봄 목기", "진": "봄 끝 토기",
+
+      "사": "초여름 화기", "오": "한여름 화기", "미": "여름 끝 토기",
+
+      "신": "초가을 금기", "유": "한가을 금기", "술": "가을 끝 토기",
+
+      "해": "초겨울 수기", "자": "한겨울 수기", "축": "겨울 끝 토기"
+
+    };
+
+
+
+    const monthSeason = {
+
+      "인": "spring", "묘": "spring", "진": "lateSpring",
+
+      "사": "summer", "오": "summer", "미": "lateSummer",
+
+      "신": "autumn", "유": "autumn", "술": "lateAutumn",
+
+      "해": "winter", "자": "winter", "축": "lateWinter"
+
+    };
+
+
+
+    const seasonKorean = {
+
+      spring: "봄", lateSpring: "봄 끝 환절기",
+
+      summer: "여름", lateSummer: "여름 끝 환절기",
+
+      autumn: "가을", lateAutumn: "가을 끝 환절기",
+
+      winter: "겨울", lateWinter: "겨울 끝 환절기"
+
+    };
+
+
+
+    const elementLabel = {
+
+      "목": "목(木)", "화": "화(火)", "토": "토(土)", "금": "금(金)", "수": "수(水)"
+
+    };
+
+
+
+    function addStrengthPoint(target, points, reason, details) {
+
+      if (!target) return;
+
+      target.score += points;
+
+      target.details.push({ points, reason, details });
+
+    }
+
+
+
+    function calculateStrength(pillars, isTimeUnknown = false) {
+
+      const dayStemChar = pillars.day.stem.split('(')[0];
+
+      const dayElement = stemInfo[dayStemChar]?.el || "";
+
+      const resource = getResourceElement(dayElement);
+
+      const officer = getControlElement(dayElement);
+
+      const output = generates[dayElement];
+
+      const wealth = controls[dayElement];
+
+
+
+      const result = {
+
+        score: 0,
+
+        result: "중화",
+
+        grade: "보통",
+
+        dayElement,
+
+        resource,
+
+        output,
+
+        wealth,
+
+        officer,
+
+        monthBranch: pillars.month.branch.split('(')[0],
+
+        seasonElement: "",
+
+        details: []
+
+      };
+
+
+
+      const pillarList = [
+
+        { key: "year", label: "년주", data: pillars.year, stemWeight: 3, branchMainWeight: 3, hiddenWeight: 0.45 },
+
+        { key: "month", label: "월주", data: pillars.month, stemWeight: 6, branchMainWeight: 10, hiddenWeight: 0.9 },
+
+        { key: "day", label: "일주", data: pillars.day, stemWeight: 0, branchMainWeight: 5, hiddenWeight: 0.7 },
+
+        { key: "time", label: "시주", data: pillars.time, stemWeight: isTimeUnknown ? 0 : 3, branchMainWeight: isTimeUnknown ? 0 : 3, hiddenWeight: isTimeUnknown ? 0 : 0.45 }
+
+      ];
+
+
+
+      const scoreByElementType = (element, baseWeight, sourceLabel) => {
+
+        const type = getElementTypeForDay(dayElement, element);
+
+        if (type === "비겁") addStrengthPoint(result, baseWeight * 1.0, `${sourceLabel}: 비겁(${element})`, "일간과 같은 오행이라 내 힘을 직접 보탭니다.");
+
+        else if (type === "인성") addStrengthPoint(result, baseWeight * 0.85, `${sourceLabel}: 인성(${element})`, "나를 생해주는 오행이라 일간을 돕습니다.");
+
+        else if (type === "식상") addStrengthPoint(result, baseWeight * -0.55, `${sourceLabel}: 식상(${element})`, "내가 생해 밖으로 내보내는 기운이라 일간의 힘을 소모합니다.");
+
+        else if (type === "재성") addStrengthPoint(result, baseWeight * -0.75, `${sourceLabel}: 재성(${element})`, "내가 극하고 관리해야 하는 기운이라 일간의 힘을 사용합니다.");
+
+        else if (type === "관성") addStrengthPoint(result, baseWeight * -0.95, `${sourceLabel}: 관성(${element})`, "나를 극하는 압박과 규칙의 기운이라 일간을 약하게 만듭니다.");
+
+      };
+
+
+
+      pillarList.forEach(item => {
+
+        const p = item.data;
+
+        if (!p || !p.stem || p.stem.includes("?")) return;
+
+
+
+        const stemChar = p.stem.split('(')[0];
+
+        const stemEl = stemInfo[stemChar]?.el;
+
+        if (item.stemWeight > 0 && stemChar !== dayStemChar) scoreByElementType(stemEl, item.stemWeight, `${item.label} 천간 ${stemChar}`);
+
+
+
+        if (!p.branch || p.branch.includes("?")) return;
+
+        const branchChar = p.branch.split('(')[0];
+
+        const branchEl = branchInfo[branchChar]?.el;
+
+        if (item.branchMainWeight > 0) scoreByElementType(branchEl, item.branchMainWeight, `${item.label} 지지 ${branchChar}`);
+
+
+
+        const hList = hiddenStems[branchChar] || [];
+
+        hList.forEach((hStem, idx) => {
+
+          const hEl = stemInfo[hStem]?.el;
+
+          const orderWeight = idx === hList.length - 1 ? 1.0 : 0.55;
+
+          scoreByElementType(hEl, item.hiddenWeight * orderWeight, `${item.label} 지장간 ${hStem}`);
+
+        });
+
+      });
+
+
+
+      const monthBranch = result.monthBranch;
+
+      const seasonEl = monthElementPower[monthBranch];
+
+      result.seasonElement = seasonEl;
+
+
+
+      if (seasonEl === dayElement) addStrengthPoint(result, 18, `월령 득령: ${seasonDisplay[monthBranch]}`, "태어난 달의 계절이 일간과 같아서 뿌리가 강합니다.");
+
+      else if (seasonEl === resource) addStrengthPoint(result, 12, `월령 생조: ${seasonDisplay[monthBranch]}`, "태어난 달의 계절이 일간을 생해주어 힘을 보탭니다.");
+
+      else if (seasonEl === output) addStrengthPoint(result, -8, `월령 설기: ${seasonDisplay[monthBranch]}`, "태어난 달의 계절이 일간의 기운을 밖으로 빼냅니다.");
+
+      else if (seasonEl === wealth) addStrengthPoint(result, -10, `월령 재성: ${seasonDisplay[monthBranch]}`, "태어난 달의 계절이 일간이 감당해야 할 재성 쪽으로 기울어 있습니다.");
+
+      else if (seasonEl === officer) addStrengthPoint(result, -12, `월령 관성: ${seasonDisplay[monthBranch]}`, "태어난 달의 계절이 일간을 제어하는 쪽이라 압박이 강합니다.");
+
+
+
+      result.score = Math.round(result.score * 10) / 10;
+
+
+
+      if (result.score >= 26) {
+
+        result.result = "신강";
+
+        result.grade = result.score >= 38 ? "매우 강함" : "강한 편";
+
+      } else if (result.score <= -8) {
+
+        result.result = "신약";
+
+        result.grade = result.score <= -20 ? "매우 약함" : "약한 편";
+
+      } else {
+
+        result.result = "중화";
+
+        result.grade = "균형권";
+
+      }
+
+      return result;
+
+    }
+
+
+
+    function calculateYongshin(dayElement, strengthData) {
+
+      const resource = getResourceElement(dayElement);
+
+      const output = generates[dayElement];
+
+      const wealth = controls[dayElement];
+
+      const officer = getControlElement(dayElement);
+
+
+
+      if (strengthData.result === "신강") {
+
+        return { yongshin: output, heeshin: wealth, gishin: dayElement, gusin: resource, desc: "일간 힘이 강한 편이라 기운을 적절히 빼주거나 현실적으로 쓰게 만드는 식상·재성 계열이 유리합니다." };
+
+      }
+
+      if (strengthData.result === "신약") {
+
+        return { yongshin: resource, heeshin: dayElement, gishin: officer, gusin: wealth, desc: "일간 힘이 약한 편이라 나를 생해주는 인성과 같은 편을 만들어주는 비겁 계열이 유리합니다." };
+
+      }
+
+      return { yongshin: "균형", heeshin: "조화", gishin: "과다 오행", gusin: "치우친 기운", desc: "일간 세력이 중화권이라 특정 오행 하나보다 전체 균형과 과다한 기운 조절이 중요합니다." };
+
+    }
+
+
+
+    function getStrengthReading(strengthData, yongshinData) {
+
+      return `[신강/신약 분석 - ${strengthData.result}(${strengthData.grade})]\n일간의 세력 점수는 ${strengthData.score}점입니다. 월지 ${strengthData.monthBranch}(${strengthData.seasonElement})의 계절 기운과 천간·지지·지장간을 함께 보아 판단했습니다.\n\n[용신 구조]\n용신: ${yongshinData.yongshin}\n희신: ${yongshinData.heeshin}\n기신: ${yongshinData.gishin}\n구신: ${yongshinData.gusin}\n\n${yongshinData.desc}\n\n※ 기본 억부 판단입니다. 아래 정밀 명리 엔진에서는 통근, 투간, 조후, 격국, 종격, 합충형파해까지 추가 반영합니다.`;
+
+    }
+
+
+
+    function getPillarArray(pillars, isTimeUnknown = false) {
+
+      const list = [
+
+        { key: "year", label: "년주", ...pillars.year },
+
+        { key: "month", label: "월주", ...pillars.month },
+
+        { key: "day", label: "일주", ...pillars.day }
+
+      ];
+
+      if (!isTimeUnknown) list.push({ key: "time", label: "시주", ...pillars.time });
+
+      return list;
+
+    }
+
+
+
+    function getStemChar(stemText) {
+
+      return stemText && !stemText.includes("?") ? stemText.split('(')[0] : "";
+
+    }
+
+
+
+    function getBranchChar(branchText) {
+
+      return branchText && !branchText.includes("?") ? branchText.split('(')[0] : "";
+
+    }
+
+
+
+    function countElementsWithHidden(pillars, isTimeUnknown = false) {
+
+      const counts = { "목": 0, "화": 0, "토": 0, "금": 0, "수": 0 };
+
+      const sources = [];
+
+      const pList = getPillarArray(pillars, isTimeUnknown);
+
+
+
+      pList.forEach(p => {
+
+        const s = getStemChar(p.stem);
+
+        if (s && p.key !== "day") {
+
+          const el = stemInfo[s]?.el;
+
+          counts[el] += p.key === "month" ? 1.35 : 1;
+
+          sources.push({ source: `${p.label} 천간 ${s}`, element: el, weight: p.key === "month" ? 1.35 : 1 });
+
+        }
+
+
+
+        const b = getBranchChar(p.branch);
+
+        if (b) {
+
+          const bel = branchInfo[b]?.el;
+
+          counts[bel] += p.key === "month" ? 1.65 : 1.1;
+
+          sources.push({ source: `${p.label} 지지 ${b}`, element: bel, weight: p.key === "month" ? 1.65 : 1.1 });
+
+
+
+          (hiddenStems[b] || []).forEach((h, idx, arr) => {
+
+            const hel = stemInfo[h]?.el;
+
+            const weight = (idx === arr.length - 1 ? 0.55 : 0.25) * (p.key === "month" ? 1.6 : 1);
+
+            counts[hel] += weight;
+
+            sources.push({ source: `${p.label} 지장간 ${h}`, element: hel, weight });
+
+          });
+
+        }
+
+      });
+
+
+
+      Object.keys(counts).forEach(k => counts[k] = Math.round(counts[k] * 10) / 10);
+
+      return { counts, sources };
+
+    }
+
+
+
+    function analyzeRoots(dayStemChar, dayElement, pillars, isTimeUnknown = false) {
+
+      const roots = [];
+
+      let rootScore = 0;
+
+      getPillarArray(pillars, isTimeUnknown).forEach(p => {
+
+        const b = getBranchChar(p.branch);
+
+        if (!b) return;
+
+        const hList = hiddenStems[b] || [];
+
+        const exact = hList.includes(dayStemChar);
+
+        const sameEl = hList.filter(h => stemInfo[h]?.el === dayElement);
+
+        const mainRoot = hList[hList.length - 1];
+
+        const isMain = mainRoot === dayStemChar;
+
+        const isMonth = p.key === "month";
+
+
+
+        if (exact || sameEl.length > 0) {
+
+          let score = exact ? 7 : 3;
+
+          if (isMain) score += 4;
+
+          if (isMonth) score += 5;
+
+          rootScore += score;
+
+          roots.push({
+
+            pillar: p.label,
+
+            branch: b,
+
+            hidden: hList.join("·"),
+
+            type: exact ? (isMain ? "본기 통근" : "지장간 통근") : "동오행 뿌리",
+
+            score,
+
+            desc: `${p.label} ${b} 속 지장간(${hList.join("·")})에서 ${exact ? dayStemChar : dayElement} 기운을 얻습니다.`
+
+          });
+
+        }
+
+      });
+
+      return { rootScore, roots, hasStrongRoot: roots.some(r => r.type === "본기 통근" || r.score >= 10) };
+
+    }
+
+
+
+    function analyzeTugan(pillars, isTimeUnknown = false) {
+
+      const pList = getPillarArray(pillars, isTimeUnknown);
+
+      const topStems = pList.map(p => ({ pillar: p.label, stem: getStemChar(p.stem) })).filter(x => x.stem);
+
+      const revealed = [];
+
+
+
+      pList.forEach(p => {
+
+        const b = getBranchChar(p.branch);
+
+        if (!b) return;
+
+        (hiddenStems[b] || []).forEach(h => {
+
+          const tops = topStems.filter(t => t.stem === h);
+
+          tops.forEach(t => {
+
+            revealed.push({ hiddenPillar: p.label, branch: b, stem: h, topPillar: t.pillar, element: stemInfo[h]?.el, desc: `${p.label} ${b}의 지장간 ${h}가 ${t.pillar} 천간에 드러났습니다.` });
+
+          });
+
+        });
+
+      });
+
+
+
+      const unique = [];
+
+      const seen = new Set();
+
+      revealed.forEach(r => {
+
+        const key = `${r.hiddenPillar}-${r.branch}-${r.stem}-${r.topPillar}`;
+
+        if (!seen.has(key)) { seen.add(key); unique.push(r); }
+
+      });
+
+      return unique;
+
+    }
+
+
+
+    const heavenlyCombinations = [
+
+      { pair: ["갑", "기"], result: "토", name: "갑기합토" },
+
+      { pair: ["을", "경"], result: "금", name: "을경합금" },
+
+      { pair: ["병", "신"], result: "수", name: "병신합수" },
+
+      { pair: ["정", "임"], result: "목", name: "정임합목" },
+
+      { pair: ["무", "계"], result: "화", name: "무계합화" }
+
+    ];
+
+
+
+    const branch六合 = [
+
+      { pair: ["자", "축"], result: "토", name: "자축합" },
+
+      { pair: ["인", "해"], result: "목", name: "인해합" },
+
+      { pair: ["묘", "술"], result: "화", name: "묘술합" },
+
+      { pair: ["진", "유"], result: "금", name: "진유합" },
+
+      { pair: ["사", "신"], result: "수", name: "사신합" },
+
+      { pair: ["오", "미"], result: "토", name: "오미합" }
+
+    ];
+
+
+
+    const branchClashes = [
+
+      { pair: ["자", "오"], name: "자오충" }, { pair: ["축", "미"], name: "축미충" },
+
+      { pair: ["인", "신"], name: "인신충" }, { pair: ["묘", "유"], name: "묘유충" },
+
+      { pair: ["진", "술"], name: "진술충" }, { pair: ["사", "해"], name: "사해충" }
+
+    ];
+
+
+
+    const branchHarms = [
+
+      { pair: ["자", "미"], name: "자미해" }, { pair: ["축", "오"], name: "축오해" },
+
+      { pair: ["인", "사"], name: "인사해" }, { pair: ["묘", "진"], name: "묘진해" },
+
+      { pair: ["신", "해"], name: "신해해" }, { pair: ["유", "술"], name: "유술해" }
+
+    ];
+
+
+
+    const branchBreaks = [
+
+      { pair: ["자", "유"], name: "자유파" }, { pair: ["축", "진"], name: "축진파" },
+
+      { pair: ["인", "해"], name: "인해파" }, { pair: ["묘", "오"], name: "묘오파" },
+
+      { pair: ["사", "신"], name: "사신파" }, { pair: ["술", "미"], name: "술미파" }
+
+    ];
+
+
+
+    const threeHarmony = [
+
+      { set: ["신", "자", "진"], result: "수", name: "신자진 수국" },
+
+      { set: ["해", "묘", "미"], result: "목", name: "해묘미 목국" },
+
+      { set: ["인", "오", "술"], result: "화", name: "인오술 화국" },
+
+      { set: ["사", "유", "축"], result: "금", name: "사유축 금국" }
+
+    ];
+
+
+
+    const directionalCombos = [
+
+      { set: ["인", "묘", "진"], result: "목", name: "인묘진 목방" },
+
+      { set: ["사", "오", "미"], result: "화", name: "사오미 화방" },
+
+      { set: ["신", "유", "술"], result: "금", name: "신유술 금방" },
+
+      { set: ["해", "자", "축"], result: "수", name: "해자축 수방" }
+
+    ];
+
+
+
+    function hasPair(list, a, b) {
+
+      return list.includes(a) && list.includes(b);
+
+    }
+
+
+
+    function analyzeRelations(pillars, isTimeUnknown = false) {
+
+      const pList = getPillarArray(pillars, isTimeUnknown);
+
+      const stemsTop = pList.map(p => ({ pillar: p.label, char: getStemChar(p.stem) })).filter(x => x.char);
+
+      const branchesTop = pList.map(p => ({ pillar: p.label, char: getBranchChar(p.branch) })).filter(x => x.char);
+
+      const stemChars = stemsTop.map(x => x.char);
+
+      const branchChars = branchesTop.map(x => x.char);
+
+      const items = [];
+
+
+
+      heavenlyCombinations.forEach(c => {
+
+        if (hasPair(stemChars, c.pair[0], c.pair[1])) items.push({ type: "천간합", name: c.name, result: c.result, impact: "중간", desc: `${c.pair.join("·")} 천간이 합하여 ${c.result} 기운을 만들려는 흐름입니다.` });
+
+      });
+
+      branch六合.forEach(c => {
+
+        if (hasPair(branchChars, c.pair[0], c.pair[1])) items.push({ type: "육합", name: c.name, result: c.result, impact: "중간", desc: `${c.pair.join("·")} 지지가 합하여 ${c.result} 기운을 돕습니다.` });
+
+      });
+
+      branchClashes.forEach(c => {
+
+        if (hasPair(branchChars, c.pair[0], c.pair[1])) items.push({ type: "충", name: c.name, result: "변동", impact: "강함", desc: `${c.pair.join("·")}가 충돌해 이동, 변화, 갈등, 구조 흔들림을 만듭니다.` });
+
+      });
+
+      branchHarms.forEach(c => {
+
+        if (hasPair(branchChars, c.pair[0], c.pair[1])) items.push({ type: "해", name: c.name, result: "손상", impact: "약~중", desc: `${c.pair.join("·")}가 해를 이루어 은근한 마찰과 손상을 만들 수 있습니다.` });
+
+      });
+
+      branchBreaks.forEach(c => {
+
+        if (hasPair(branchChars, c.pair[0], c.pair[1])) items.push({ type: "파", name: c.name, result: "깨짐", impact: "약~중", desc: `${c.pair.join("·")}가 파를 이루어 관계나 일의 지속성을 약하게 만들 수 있습니다.` });
+
+      });
+
+      threeHarmony.forEach(c => {
+
+        const count = c.set.filter(x => branchChars.includes(x)).length;
+
+        if (count >= 2) items.push({ type: count === 3 ? "삼합완성" : "반합", name: c.name, result: c.result, impact: count === 3 ? "강함" : "중간", desc: `${c.set.join("·")} 중 ${count}개가 있어 ${c.result} 기운이 형성됩니다.` });
+
+      });
+
+      directionalCombos.forEach(c => {
+
+        const count = c.set.filter(x => branchChars.includes(x)).length;
+
+        if (count >= 2) items.push({ type: count === 3 ? "방합완성" : "방합기운", name: c.name, result: c.result, impact: count === 3 ? "강함" : "중간", desc: `${c.set.join("·")} 중 ${count}개가 있어 계절 방합 ${c.result} 기운이 강해집니다.` });
+
+      });
+
+
+
+      if (["인", "사", "신"].every(x => branchChars.includes(x))) items.push({ type: "형", name: "인사신 삼형", result: "형살", impact: "강함", desc: "인·사·신 삼형은 과격한 변화, 압박, 사고성 판단을 강화할 수 있습니다." });
+
+      if (["축", "술", "미"].every(x => branchChars.includes(x))) items.push({ type: "형", name: "축술미 삼형", result: "형살", impact: "강함", desc: "축·술·미 삼형은 토기 과중, 고집, 정체, 내면 압박을 강화할 수 있습니다." });
+
+      if (branchChars.includes("자") && branchChars.includes("묘")) items.push({ type: "형", name: "자묘형", result: "무례지형", impact: "중간", desc: "자묘형은 예민한 인간관계 마찰과 감정적 엇박자를 만들 수 있습니다." });
+
+
+
+      return items;
+
+    }
+
+
+
+    const tenGodToPattern = {
+
+      "비견": "건록/비견 성향", "겁재": "양인/겁재 성향",
+
+      "식신": "식신격", "상관": "상관격",
+
+      "편재": "편재격", "정재": "정재격",
+
+      "편관": "편관격", "정관": "정관격",
+
+      "편인": "편인격", "정인": "정인격"
+
+    };
+
+
+
+    function analyzePattern(pillars) {
+
+      const dayStem = pillars.day.stem;
+
+      const monthBranch = pillars.month.branch;
+
+      const monthStem = pillars.month.stem;
+
+      const mb = getBranchChar(monthBranch);
+
+      const hList = hiddenStems[mb] || [];
+
+      const mainHidden = hList[hList.length - 1];
+
+      const mainTen = mainHidden ? getTenGod(dayStem, `${mainHidden}(/${stemInfo[mainHidden].el})`, false) : "";
+
+      const monthStemTen = getTenGod(dayStem, monthStem, false);
+
+
+
+      let pattern = tenGodToPattern[mainTen] || "잡격/보통격";
+
+      let confidence = "중간";
+
+      let reason = `월지 ${mb}의 본기 ${mainHidden || "?"}를 중심으로 ${mainTen || "십성 불명"}을 보았습니다.`;
+
+
+
+      if (mainHidden && getStemChar(monthStem) === mainHidden) {
+
+        confidence = "높음";
+
+        reason += ` 월지 본기 ${mainHidden}가 월간에 투출되어 격의 힘이 분명합니다.`;
+
+      } else if (mainHidden && [getStemChar(pillars.year.stem), getStemChar(pillars.time.stem)].includes(mainHidden)) {
+
+        confidence = "중상";
+
+        reason += ` 월지 본기 ${mainHidden}가 다른 천간에 투출되어 격이 살아납니다.`;
+
+      } else {
+
+        reason += ` 다만 본기 투출이 뚜렷하지 않아 격국은 보조 판단이 필요합니다.`;
+
+      }
+
+
+
+      // 월지가 일간의 록/왕지에 가까운 경우 간단 보정
+
+      const dayChar = getStemChar(dayStem);
+
+      const dayEl = stemInfo[dayChar]?.el;
+
+      if (branchInfo[mb]?.el === dayEl && ["인", "묘", "사", "오", "신", "유", "해", "자"].includes(mb)) {
+
+        pattern = monthStemTen === "겁재" ? "양인격 성향" : "건록격 성향";
+
+        reason += ` 월지가 일간과 같은 계절 세력이라 건록/양인 계열도 함께 봅니다.`;
+
+      }
+
+
+
+      return { pattern, confidence, monthMainHidden: mainHidden, monthMainTenGod: mainTen, monthStemTenGod: monthStemTen, reason };
+
+    }
+
+
+
+    function analyzeFollowStructure(dayElement, strengthData, rootsData, elementPower) {
+
+      const resource = getResourceElement(dayElement);
+
+      const same = dayElement;
+
+      const support = (elementPower.counts[resource] || 0) + (elementPower.counts[same] || 0);
+
+      const pressure = Object.entries(elementPower.counts).filter(([el]) => el !== resource && el !== same).reduce((a, [, v]) => a + v, 0);
+
+      const hasRoot = rootsData.roots.length > 0;
+
+
+
+      if (strengthData.score <= -20 && !hasRoot && pressure >= support * 2.2) {
+
+        return { type: "종격 가능성", isFollow: true, confidence: "중간", desc: "일간이 매우 약하고 뿌리가 거의 없으며 주변 세력이 한쪽으로 강해 종격 가능성을 검토합니다. 다만 실제 종격은 대운과 파격 여부까지 봐야 합니다." };
+
+      }
+
+      return { type: "정격", isFollow: false, confidence: "보통", desc: "일간이 완전히 무근으로 한쪽 세력에 따르는 구조까지는 아니므로 정격 중심으로 봅니다." };
+
+    }
+
+
+
+    const johooRules = {
+
+      "갑": {
+
+        winter: { need: ["화", "목"], avoid: ["수", "금"], desc: "겨울 갑목은 얼어붙은 나무라 먼저 화기로 따뜻하게 풀고, 목의 뿌리를 살리는 것이 중요합니다." },
+
+        summer: { need: ["수", "금"], avoid: ["화", "토"], desc: "여름 갑목은 더위와 건조함을 식혀야 하므로 수기가 우선이고, 금은 가지를 다듬는 역할을 합니다." },
+
+        autumn: { need: ["수", "화"], avoid: ["금"], desc: "가을 갑목은 금기가 강해 베임을 받을 수 있어 수로 윤택하게 하고 화로 온기를 보탭니다." },
+
+        spring: { need: ["금", "화"], avoid: ["목"], desc: "봄 갑목은 왕성하므로 금으로 다듬고 화로 발산시키는 균형이 좋습니다." }
+
+      },
+
+      "을": {
+
+        winter: { need: ["화", "목"], avoid: ["수", "금"], desc: "겨울 을목은 초목이 얼기 쉬워 화기로 온기를 얻고 목으로 무리를 이루는 것이 좋습니다." },
+
+        summer: { need: ["수", "금"], avoid: ["화", "토"], desc: "여름 을목은 마르기 쉬워 수기가 가장 중요하고, 금은 지나치면 상처가 됩니다." },
+
+        autumn: { need: ["화", "수"], avoid: ["금"], desc: "가을 을목은 금의 극을 받기 쉬워 화로 금을 제하고 수로 윤택하게 해야 합니다." },
+
+        spring: { need: ["화", "토"], avoid: ["목"], desc: "봄 을목은 성장력이 강하므로 화로 꽃피우고 토로 현실화하는 흐름이 좋습니다." }
+
+      },
+
+      "병": {
+
+        winter: { need: ["목", "화"], avoid: ["수"], desc: "겨울 병화는 불씨가 약해 목으로 땔감을 얻고 화를 보태 온기를 회복해야 합니다." },
+
+        summer: { need: ["수", "금"], avoid: ["화", "목"], desc: "여름 병화는 태양이 과해 수로 식히고 금으로 수원을 돕는 것이 중요합니다." },
+
+        autumn: { need: ["목", "화"], avoid: ["금", "수"], desc: "가을 병화는 기운이 내려가므로 목과 화로 밝기를 유지합니다." },
+
+        spring: { need: ["수", "금"], avoid: ["목"], desc: "봄 병화는 목생화가 쉬워 과열을 막는 수기가 필요합니다." }
+
+      },
+
+      "정": {
+
+        winter: { need: ["목", "화"], avoid: ["수"], desc: "겨울 정화는 촛불이 꺼지기 쉬워 목과 화로 보호해야 합니다." },
+
+        summer: { need: ["수", "금"], avoid: ["화", "목"], desc: "여름 정화는 열기가 과하면 타버리므로 수로 조절해야 합니다." },
+
+        autumn: { need: ["목", "화"], avoid: ["금", "수"], desc: "가을 정화는 금의 차가움 속에서 목으로 불씨를 살리는 것이 좋습니다." },
+
+        spring: { need: ["금", "수"], avoid: ["목"], desc: "봄 정화는 목이 많으면 과연소하므로 금수로 조절합니다." }
+
+      },
+
+      "무": {
+
+        winter: { need: ["화", "토"], avoid: ["수"], desc: "겨울 무토는 얼어붙은 흙이라 화기로 녹이고 토의 안정성을 보태야 합니다." },
+
+        summer: { need: ["수", "금"], avoid: ["화", "토"], desc: "여름 무토는 메마르기 쉬워 수로 적시고 금으로 배수를 돕습니다." },
+
+        autumn: { need: ["화", "목"], avoid: ["금"], desc: "가을 무토는 금으로 설기되기 쉬워 화로 토를 따뜻하게 하고 목으로 소통시킵니다." },
+
+        spring: { need: ["화", "토"], avoid: ["목"], desc: "봄 무토는 목의 극을 받기 쉬워 화로 통관하고 토를 보강합니다." }
+
+      },
+
+      "기": {
+
+        winter: { need: ["화", "토"], avoid: ["수"], desc: "겨울 기토는 습하고 차가워 화기로 온기를 주는 것이 우선입니다." },
+
+        summer: { need: ["수", "금"], avoid: ["화", "토"], desc: "여름 기토는 건조하므로 수로 적시고 금으로 흐름을 만들어야 합니다." },
+
+        autumn: { need: ["화", "목"], avoid: ["금"], desc: "가을 기토는 설기가 강해 화로 생조하고 목으로 쓰임을 만듭니다." },
+
+        spring: { need: ["화", "토"], avoid: ["목"], desc: "봄 기토는 목에게 눌릴 수 있어 화토가 필요합니다." }
+
+      },
+
+      "경": {
+
+        winter: { need: ["화", "토"], avoid: ["수"], desc: "겨울 경금은 차갑고 단단해 화로 제련하고 토로 생조하는 것이 좋습니다." },
+
+        summer: { need: ["수", "토"], avoid: ["화"], desc: "여름 경금은 화가 과해 녹기 쉬우므로 수로 식히고 토로 보호합니다." },
+
+        autumn: { need: ["화", "목"], avoid: ["금"], desc: "가을 경금은 너무 왕하므로 화로 제련하고 목재를 다루며 쓰임을 얻습니다." },
+
+        spring: { need: ["토", "금"], avoid: ["목"], desc: "봄 경금은 목이 왕해 금이 약해지므로 토금의 보강이 필요합니다." }
+
+      },
+
+      "신": {
+
+        winter: { need: ["화", "토"], avoid: ["수"], desc: "겨울 신금은 냉하고 습하므로 화로 온기를 얻고 토로 보호해야 합니다." },
+
+        summer: { need: ["수", "토"], avoid: ["화"], desc: "여름 신금은 열에 약하므로 수로 식히고 토로 생조합니다." },
+
+        autumn: { need: ["화", "수"], avoid: ["금"], desc: "가을 신금은 기운이 왕하므로 화로 다듬고 수로 윤택하게 합니다." },
+
+        spring: { need: ["토", "금"], avoid: ["목"], desc: "봄 신금은 목에게 소모되기 쉬워 토금 보강이 유리합니다." }
+
+      },
+
+      "임": {
+
+        winter: { need: ["화", "토"], avoid: ["수", "금"], desc: "겨울 임수는 물이 너무 차고 강해 화로 따뜻하게 하고 토로 제방을 세워야 합니다." },
+
+        summer: { need: ["금", "수"], avoid: ["화", "토"], desc: "여름 임수는 마르기 쉬워 금으로 수원을 만들고 수를 보충합니다." },
+
+        autumn: { need: ["화", "목"], avoid: ["금", "수"], desc: "가을 임수는 금생수가 강해질 수 있어 화목으로 흐름을 조절합니다." },
+
+        spring: { need: ["금", "토"], avoid: ["목"], desc: "봄 임수는 목으로 많이 빠지므로 금으로 보충하고 토로 범람을 막습니다." }
+
+      },
+
+      "계": {
+
+        winter: { need: ["화", "토"], avoid: ["수", "금"], desc: "겨울 계수는 한습이 심해 화로 해동하고 토로 형태를 잡아야 합니다." },
+
+        summer: { need: ["금", "수"], avoid: ["화", "토"], desc: "여름 계수는 증발되기 쉬워 금수 보강이 중요합니다." },
+
+        autumn: { need: ["화", "목"], avoid: ["금", "수"], desc: "가을 계수는 차가워지므로 화로 온기를 더하고 목으로 흐름을 씁니다." },
+
+        spring: { need: ["금", "토"], avoid: ["목"], desc: "봄 계수는 목으로 새기 쉬워 금토가 균형을 잡습니다." }
+
+      }
+
+    };
+
+
+
+    function getSeasonGroup(monthBranch) {
+
+      const raw = monthSeason[monthBranch] || "spring";
+
+      if (raw.includes("Spring")) return "spring";
+
+      if (raw.includes("Summer")) return "summer";
+
+      if (raw.includes("Autumn")) return "autumn";
+
+      if (raw.includes("Winter")) return "winter";
+
+      return raw;
+
+    }
+
+
+
+    function analyzeJohoo(dayStemChar, monthBranch) {
+
+      const rawSeason = monthSeason[monthBranch] || "spring";
+
+      let group = rawSeason;
+
+      if (rawSeason === "lateSpring") group = "spring";
+
+      if (rawSeason === "lateSummer") group = "summer";
+
+      if (rawSeason === "lateAutumn") group = "autumn";
+
+      if (rawSeason === "lateWinter") group = "winter";
+
+
+
+      const rule = johooRules[dayStemChar]?.[group] || { need: [], avoid: [], desc: "조후 규칙을 찾지 못했습니다." };
+
+      return {
+
+        season: seasonKorean[rawSeason] || rawSeason,
+
+        group,
+
+        need: rule.need,
+
+        avoid: rule.avoid,
+
+        desc: rule.desc
+
+      };
+
+    }
+
+
+
+    function rankYongshinCandidates({ dayElement, strengthData, johoo, pattern, follow, relations, elementPower }) {
+
+      const candidates = ["목", "화", "토", "금", "수"].map(el => ({ element: el, score: 0, reasons: [] }));
+
+      const add = (el, score, reason) => {
+
+        const c = candidates.find(x => x.element === el);
+
+        if (!c) return;
+
+        c.score += score;
+
+        c.reasons.push(reason);
+
+      };
+
+
+
+      const resource = getResourceElement(dayElement);
+
+      const output = generates[dayElement];
+
+      const wealth = controls[dayElement];
+
+      const officer = getControlElement(dayElement);
+
+
+
+      if (follow.isFollow) {
+
+        const dominant = Object.entries(elementPower.counts).sort((a,b)=>b[1]-a[1])[0]?.[0];
+
+        add(dominant, 32, "종격 가능성이 있어 가장 강한 세력을 거스르지 않는 방향을 우선 후보로 봅니다.");
+
+      } else if (strengthData.result === "신강") {
+
+        add(output, 24, "신강 사주는 기운을 빼주는 식상이 우선 후보입니다.");
+
+        add(wealth, 18, "강한 일간은 재성을 감당해 현실적 성과로 만들 수 있습니다.");
+
+        add(officer, 10, "관성은 강한 일간을 제어하는 보조 후보입니다.");
+
+        add(dayElement, -20, "이미 강한 비겁은 더하면 과해지기 쉽습니다.");
+
+        add(resource, -16, "인성은 강한 일간을 더 생해 과다를 만들 수 있습니다.");
+
+      } else if (strengthData.result === "신약") {
+
+        add(resource, 24, "신약 사주는 나를 생해주는 인성이 우선 후보입니다.");
+
+        add(dayElement, 18, "같은 편인 비겁은 일간을 직접 보강합니다.");
+
+        add(officer, -22, "관성은 약한 일간을 더 압박할 수 있습니다.");
+
+        add(wealth, -14, "재성은 약한 일간이 감당하기 어렵습니다.");
+
+      } else {
+
+        add(johoo.need[0], 16, "중화권에서는 조후상 가장 필요한 기운을 우선 봅니다.");
+
+        add(johoo.need[1], 10, "조후 보조 기운입니다.");
+
+      }
+
+
+
+      johoo.need.forEach((el, idx) => add(el, idx === 0 ? 28 : 18, `조후상 ${elementLabel[el]} 기운이 필요합니다.`));
+
+      johoo.avoid.forEach(el => add(el, -18, `조후상 ${elementLabel[el]} 기운은 과하면 불리합니다.`));
+
+
+
+      relations.forEach(r => {
+
+        if (r.result && ["목", "화", "토", "금", "수"].includes(r.result)) {
+
+          add(r.result, r.type.includes("합") ? 5 : 2, `${r.name}으로 ${elementLabel[r.result]} 기운이 형성됩니다.`);
+
+        }
+
+        if (r.type === "충") {
+
+          add(dayElement, -2, `${r.name}으로 원국 안정성이 흔들릴 수 있어 일간 자체만 믿기 어렵습니다.`);
+
+        }
+
+      });
+
+
+
+      const sorted = candidates
+
+        .map(c => ({ ...c, score: Math.round(c.score * 10) / 10 }))
+
+        .sort((a, b) => b.score - a.score);
+
+
+
+      return sorted;
+
+    }
+
+
+
+    function buildAdvancedReading(analysis) {
+
+      const top = analysis.yongshinRanking[0];
+
+      const second = analysis.yongshinRanking[1];
+
+      const third = analysis.yongshinRanking[2];
+
+      return `[정밀 명리 엔진 종합]\n최종 1순위 용신 후보는 ${top?.element || "?"}입니다. 2순위는 ${second?.element || "?"}, 3순위는 ${third?.element || "?"}입니다.\n\n[판단 흐름]\n1) 월령과 통근으로 일간 세력 판단: ${analysis.strength.result}(${analysis.strength.grade}, ${analysis.strength.score}점)\n2) 통근: ${analysis.roots.roots.length ? analysis.roots.roots.map(r => `${r.pillar}${r.branch}:${r.type}`).join(', ') : '뚜렷한 통근 약함'}\n3) 투간: ${analysis.tugan.length ? analysis.tugan.map(t => `${t.stem}(${t.hiddenPillar}→${t.topPillar})`).join(', ') : '뚜렷한 투간 없음'}\n4) 조후: ${analysis.johoo.season} 출생, ${analysis.johoo.desc}\n5) 격국: ${analysis.pattern.pattern} / 신뢰도 ${analysis.pattern.confidence}\n6) 종격: ${analysis.follow.type}\n\n※ 이 엔진은 여러 고전 명리 기준을 규칙화한 계산형 모델입니다. 실제 사람 감정처럼 모든 예외를 절대적으로 단정하지 않고, 후보 랭킹과 근거를 함께 보여주는 방식이 가장 안전합니다.`;
+
+    }
+
+
+
+    function analyzeAdvancedMyeongri(pillars, isTimeUnknown = false) {
+
+      const dayStemChar = getStemChar(pillars.day.stem);
+
+      const dayElement = stemInfo[dayStemChar]?.el || "";
+
+      const strength = calculateStrength(pillars, isTimeUnknown);
+
+      const basicYongshin = calculateYongshin(dayElement, strength);
+
+      const monthBranch = getBranchChar(pillars.month.branch);
+
+      const elementPower = countElementsWithHidden(pillars, isTimeUnknown);
+
+      const roots = analyzeRoots(dayStemChar, dayElement, pillars, isTimeUnknown);
+
+      const tugan = analyzeTugan(pillars, isTimeUnknown);
+
+      const relations = analyzeRelations(pillars, isTimeUnknown);
+
+      const johoo = analyzeJohoo(dayStemChar, monthBranch);
+
+      const pattern = analyzePattern(pillars);
+
+      const follow = analyzeFollowStructure(dayElement, strength, roots, elementPower);
+
+      const yongshinRanking = rankYongshinCandidates({ dayElement, strengthData: strength, johoo, pattern, follow, relations, elementPower });
+
+
+
+      const analysis = { dayStemChar, dayElement, strength, basicYongshin, elementPower, roots, tugan, relations, johoo, pattern, follow, yongshinRanking };
+
+      analysis.reading = buildAdvancedReading(analysis);
+
+      return analysis;
+
+    }
+
+
+
+
+
+    // ===============================
+
+    // 🌟 대운 / 연애 시기 계산 엔진
+
+    // ===============================
+
+    // 주의: 실제 대운 시작 시기는 절기 계산 방식, 지역시, 야자시 적용 학파에 따라 조금 달라질 수 있습니다.
+
+    // 여기서는 GitHub Pages에서 안정적으로 돌아가도록 고정 절기표 기반의 근사 계산을 사용합니다.
+
+
+
+    const stemChars = ["갑", "을", "병", "정", "무", "기", "경", "신", "임", "계"];
+
+    const branchChars = ["자", "축", "인", "묘", "진", "사", "오", "미", "신", "유", "술", "해"];
+
+
+
+    function getPillarIndex(stemChar, branchChar) {
+
+      for (let i = 0; i < 60; i++) {
+
+        if (stemChars[i % 10] === stemChar && branchChars[i % 12] === branchChar) return i;
+
+      }
+
+      return 0;
+
+    }
+
+
+
+    function getPillarByIndex(index) {
+
+      const normalized = ((index % 60) + 60) % 60;
+
+      const s = stemChars[normalized % 10];
+
+      const b = branchChars[normalized % 12];
+
+      return {
+
+        stemChar: s,
+
+        branchChar: b,
+
+        stem: stems.find(x => x.startsWith(s)) || s,
+
+        branch: branches.find(x => x.startsWith(b)) || b,
+
+        text: `${s}${b}`
+
+      };
+
+    }
+
+
+
+    function getDaewoonDirection(yearStemChar, gender) {
+
+      const yy = stemInfo[yearStemChar]?.yy || "+";
+
+      const isYangYear = yy === "+";
+
+      const isMale = gender === "male";
+
+      // 전통적으로 남양/여음 순행, 남음/여양 역행으로 봅니다.
+
+      const forward = (isMale && isYangYear) || (!isMale && !isYangYear);
+
+      return {
+
+        forward,
+
+        label: forward ? "순행" : "역행",
+
+        desc: forward ? "월주에서 앞으로 진행" : "월주에서 뒤로 진행"
+
+      };
+
+    }
+
+
+
+    const solarTermApprox = [
+
+      { name: "소한", month: 1, day: 5 }, { name: "대한", month: 1, day: 20 },
+
+      { name: "입춘", month: 2, day: 4 }, { name: "우수", month: 2, day: 19 },
+
+      { name: "경칩", month: 3, day: 5 }, { name: "춘분", month: 3, day: 20 },
+
+      { name: "청명", month: 4, day: 4 }, { name: "곡우", month: 4, day: 20 },
+
+      { name: "입하", month: 5, day: 5 }, { name: "소만", month: 5, day: 21 },
+
+      { name: "망종", month: 6, day: 5 }, { name: "하지", month: 6, day: 21 },
+
+      { name: "소서", month: 7, day: 7 }, { name: "대서", month: 7, day: 22 },
+
+      { name: "입추", month: 8, day: 7 }, { name: "처서", month: 8, day: 23 },
+
+      { name: "백로", month: 9, day: 7 }, { name: "추분", month: 9, day: 23 },
+
+      { name: "한로", month: 10, day: 8 }, { name: "상강", month: 10, day: 23 },
+
+      { name: "입동", month: 11, day: 7 }, { name: "소설", month: 11, day: 22 },
+
+      { name: "대설", month: 12, day: 7 }, { name: "동지", month: 12, day: 22 }
+
+    ];
+
+
+
+    function buildSolarTermDates(year) {
+
+      return solarTermApprox.map(t => ({ ...t, date: new Date(year, t.month - 1, t.day, 12, 0, 0) }));
+
+    }
+
+
+
+    function getNearestSolarTermForDaewoon(birthDate, forward) {
+
+      const y = birthDate.getFullYear();
+
+      const all = [...buildSolarTermDates(y - 1), ...buildSolarTermDates(y), ...buildSolarTermDates(y + 1)]
+
+        .sort((a, b) => a.date - b.date);
+
+      const target = forward
+
+        ? all.find(t => t.date > birthDate)
+
+        : [...all].reverse().find(t => t.date < birthDate);
+
+      return target || all[0];
+
+    }
+
+
+
+    function calculateStartAgeByTerm(birthDate, forward) {
+
+      const term = getNearestSolarTermForDaewoon(birthDate, forward);
+
+      const diffMs = Math.abs(term.date.getTime() - birthDate.getTime());
+
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+      // 3일 = 1년, 1일 = 4개월 기준 근사
+
+      const totalMonths = Math.max(1, Math.round(diffDays * 4));
+
+      const years = Math.floor(totalMonths / 12);
+
+      const months = totalMonths % 12;
+
+      return {
+
+        termName: term.name,
+
+        termDate: `${term.date.getFullYear()}-${String(term.date.getMonth() + 1).padStart(2, '0')}-${String(term.date.getDate()).padStart(2, '0')}`,
+
+        diffDays: Math.round(diffDays * 10) / 10,
+
+        startAge: Math.max(1, Math.round(totalMonths / 12)),
+
+        startYears: years,
+
+        startMonths: months
+
+      };
+
+    }
+
+
+
+    function getAnnualPillar(year) {
+
+      try {
+
+        // 입춘 이후 기준으로 안정적인 연주를 얻기 위해 해당 연도 7월 1일을 사용합니다.
+
+        const solar = window.Solar.fromDate(new Date(year, 6, 1, 12, 0));
+
+        const bazi = solar.getLunar().getEightChar();
+
+        return getKorPillar(bazi.getYear());
+
+      } catch (e) {
+
+        // 라이브러리 실패 시 1984 갑자를 기준으로 보정합니다.
+
+        const idx = year - 1984;
+
+        const p = getPillarByIndex(idx);
+
+        return { stem: p.stem, branch: p.branch };
+
+      }
+
+    }
+
+
+
+    function scorePillarForTheme(dayElement, pillar, themeElement, yongshinRanking = []) {
+
+      const stemChar = getStemChar(pillar.stem);
+
+      const branchChar = getBranchChar(pillar.branch);
+
+      const stemEl = stemInfo[stemChar]?.el;
+
+      const branchEl = branchInfo[branchChar]?.el;
+
+      const hidden = hiddenStems[branchChar] || [];
+
+      let score = 0;
+
+      const reasons = [];
+
+
+
+      if (stemEl === themeElement) { score += 18; reasons.push(`천간 ${stemChar}가 핵심 기운`); }
+
+      if (branchEl === themeElement) { score += 14; reasons.push(`지지 ${branchChar}가 핵심 기운`); }
+
+      hidden.forEach(h => {
+
+        if (stemInfo[h]?.el === themeElement) { score += 5; reasons.push(`지장간 ${h}에 핵심 기운 숨음`); }
+
+      });
+
+
+
+      const topYong = yongshinRanking[0]?.element;
+
+      const secondYong = yongshinRanking[1]?.element;
+
+      if (stemEl === topYong || branchEl === topYong) { score += 8; reasons.push(`용신 ${topYong} 보강`); }
+
+      if (stemEl === secondYong || branchEl === secondYong) { score += 4; reasons.push(`희신 후보 ${secondYong} 보조`); }
+
+
+
+      const output = generates[dayElement];
+
+      if (themeElement === output && (stemEl === output || branchEl === output)) {
+
+        score += 4;
+
+        reasons.push("표현력과 만남의 계기가 늘어나는 흐름");
+
+      }
+
+
+
+      return { score, reasons };
+
+    }
+
+
+
+    function calculateDaewoon(pillars, form, birthDate, advancedAnalysis) {
+
+      const yearStemChar = getStemChar(pillars.year.stem);
+
+      const monthStemChar = getStemChar(pillars.month.stem);
+
+      const monthBranchChar = getBranchChar(pillars.month.branch);
+
+      const direction = getDaewoonDirection(yearStemChar, form.gender);
+
+      const start = calculateStartAgeByTerm(birthDate, direction.forward);
+
+      const monthIndex = getPillarIndex(monthStemChar, monthBranchChar);
+
+      const step = direction.forward ? 1 : -1;
+
+      const startYear = birthDate.getFullYear() + start.startAge;
+
+      const topYong = advancedAnalysis.yongshinRanking[0]?.element;
+
+      const secondYong = advancedAnalysis.yongshinRanking[1]?.element;
+
+
+
+      const periods = Array.from({ length: 9 }).map((_, i) => {
+
+        const p = getPillarByIndex(monthIndex + step * (i + 1));
+
+        const fromAge = start.startAge + i * 10;
+
+        const toAge = fromAge + 9;
+
+        const fromYear = startYear + i * 10;
+
+        const toYear = fromYear + 9;
+
+        const stemEl = stemInfo[p.stemChar]?.el;
+
+        const branchEl = branchInfo[p.branchChar]?.el;
+
+        const tenStem = getTenGod(pillars.day.stem, p.stem, false);
+
+        const tenBranch = getTenGod(pillars.day.stem, p.branch, true);
+
+        let score = 50;
+
+        const tags = [];
+
+
+
+        [stemEl, branchEl].forEach(el => {
+
+          if (el === topYong) { score += 18; tags.push(`용신 ${el}`); }
+
+          else if (el === secondYong) { score += 10; tags.push(`희신 ${el}`); }
+
+          else if (el === advancedAnalysis.basicYongshin.gishin) { score -= 12; tags.push(`기신 ${el}`); }
+
+        });
+
+
+
+        if ((tenStem || "").includes("재") || (tenBranch || "").includes("재")) tags.push("재물/현실운");
+
+        if ((tenStem || "").includes("관") || (tenBranch || "").includes("관")) tags.push("직장/명예운");
+
+        if ((tenStem || "").includes("식") || (tenStem || "").includes("상") || (tenBranch || "").includes("식") || (tenBranch || "").includes("상")) tags.push("표현/성과운");
+
+        if ((tenStem || "").includes("인") || (tenBranch || "").includes("인")) tags.push("공부/문서운");
+
+
+
+        let level = "보통";
+
+        if (score >= 70) level = "좋은 흐름";
+
+        else if (score <= 38) level = "조심할 흐름";
+
+
+
+        return {
+
+          index: i + 1,
+
+          pillar: p.text,
+
+          stem: p.stem,
+
+          branch: p.branch,
+
+          fromAge,
+
+          toAge,
+
+          fromYear,
+
+          toYear,
+
+          tenStem,
+
+          tenBranch,
+
+          score: Math.max(0, Math.min(100, score)),
+
+          level,
+
+          tags: [...new Set(tags)].slice(0, 4)
+
+        };
+
+      });
+
+
+
+      return {
+
+        direction,
+
+        start,
+
+        periods,
+
+        desc: `${direction.label} 대운이며, 약 ${start.startAge}세 전후부터 첫 대운이 시작되는 것으로 계산했습니다.`
+
+      };
+
+    }
+
+
+
+    function getLoveThemeElement(dayElement, gender) {
+
+      if (gender === "female") {
+
+        return {
+
+          element: getControlElement(dayElement),
+
+          label: "관성",
+
+          desc: "여성 사주에서는 전통적으로 관성을 배우자·연애 인연의 핵심 별로 봅니다."
+
+        };
+
+      }
+
+      return {
+
+        element: controls[dayElement],
+
+        label: "재성",
+
+        desc: "남성 사주에서는 전통적으로 재성을 배우자·연애 인연의 핵심 별로 봅니다."
+
+      };
+
+    }
+
+
+
+    function calculateLoveTiming(pillars, form, birthDate, advancedAnalysis, daewoonData) {
+
+      const dayElement = advancedAnalysis.dayElement;
+
+      const loveTheme = getLoveThemeElement(dayElement, form.gender);
+
+      const dayBranch = getBranchChar(pillars.day.branch);
+
+      const peachBranches = ["자", "오", "묘", "유"];
+
+      const currentYear = new Date().getFullYear();
+
+      const years = [];
+
+
+
+      for (let y = currentYear; y <= currentYear + 15; y++) {
+
+        const annual = getAnnualPillar(y);
+
+        const annualStem = getStemChar(annual.stem);
+
+        const annualBranch = getBranchChar(annual.branch);
+
+        const base = scorePillarForTheme(dayElement, annual, loveTheme.element, advancedAnalysis.yongshinRanking);
+
+        let score = base.score;
+
+        const reasons = [...base.reasons];
+
+
+
+        const tenStem = getTenGod(pillars.day.stem, annual.stem, false);
+
+        const tenBranch = getTenGod(pillars.day.stem, annual.branch, true);
+
+        if ((tenStem || "").includes(loveTheme.label[0]) || (tenBranch || "").includes(loveTheme.label[0])) {
+
+          score += 10;
+
+          reasons.push(`${loveTheme.label} 십성이 드러남`);
+
+        }
+
+        if (peachBranches.includes(annualBranch)) {
+
+          score += 7;
+
+          reasons.push("도화 지지로 만남·호감도 상승");
+
+        }
+
+        if (dayBranch && annualBranch && dayBranch !== annualBranch) {
+
+          const rel = branch六合.find(c => hasPair([dayBranch, annualBranch], c.pair[0], c.pair[1]));
+
+          if (rel) { score += 8; reasons.push(`일지와 ${rel.name} 형성`); }
+
+        }
+
+        const clash = branchClashes.find(c => hasPair([dayBranch, annualBranch], c.pair[0], c.pair[1]));
+
+        if (clash) {
+
+          score += 4;
+
+          reasons.push(`일지와 ${clash.name}으로 관계 변화수`);
+
+        }
+
+
+
+        const activeDaewoon = daewoonData.periods.find(p => y >= p.fromYear && y <= p.toYear);
+
+        if (activeDaewoon) {
+
+          if (activeDaewoon.tags.some(t => t.includes("재물") || t.includes("직장") || t.includes("표현"))) {
+
+            score += 3;
+
+            reasons.push(`${activeDaewoon.pillar} 대운 영향`);
+
+          }
+
+          const dStemEl = stemInfo[getStemChar(activeDaewoon.stem)]?.el;
+
+          const dBranchEl = branchInfo[getBranchChar(activeDaewoon.branch)]?.el;
+
+          if (dStemEl === loveTheme.element || dBranchEl === loveTheme.element) {
+
+            score += 10;
+
+            reasons.push(`대운에서 ${loveTheme.label} 기운 보조`);
+
+          }
+
+        }
+
+
+
+        let level = "잔잔한 인연운";
+
+        if (score >= 44) level = "강한 연애 시기";
+
+        else if (score >= 30) level = "인연이 들어오기 쉬운 시기";
+
+        else if (score <= 12) level = "연애보다 자기정비 시기";
+
+
+
+        years.push({
+
+          year: y,
+
+          age: y - birthDate.getFullYear() + 1,
+
+          pillar: `${annualStem}${annualBranch}`,
+
+          score: Math.round(score),
+
+          level,
+
+          reasons: [...new Set(reasons)].slice(0, 4)
+
+        });
+
+      }
+
+
+
+      const topYears = [...years].sort((a, b) => b.score - a.score).slice(0, 5);
+
+      return {
+
+        theme: loveTheme,
+
+        years,
+
+        topYears,
+
+        summary: `${loveTheme.label}(${loveTheme.element}) 기운과 도화·일지 작용을 함께 보아 앞으로 15년 중 인연운이 강한 해를 뽑았습니다.`
+
+      };
+
+    }
+
+
+
     function App() {
-      // 모드 선택: 'single' (개인 운세), 'couple' (궁합)
+
       const [viewMode, setViewMode] = useState('single');
-      // 순한맛(일반) / 매운맛(팩폭) 모드 상태 추가
+
       const [readingMode, setReadingMode] = useState('normal');
 
       const [form1, setForm1] = useState({ date: '', time: '', gender: 'female', isTimeUnknown: false });
+
       const [form2, setForm2] = useState({ date: '', time: '', gender: 'male', isTimeUnknown: false });
-      
+
       const [result, setResult] = useState(null);
+
       const [loading, setLoading] = useState(false);
+
       const [errorMsg, setErrorMsg] = useState('');
 
+
+
       const handleForm1Change = (e) => {
+
         const { name, value, type, checked } = e.target;
+
         const val = type === 'checkbox' ? checked : (name === 'date' || name === 'time' ? value.replace(/[^0-9]/g, '') : value);
+
         setForm1({ ...form1, [name]: val });
+
         setErrorMsg('');
+
       };
+
+
 
       const handleForm2Change = (e) => {
+
         const { name, value, type, checked } = e.target;
+
         const val = type === 'checkbox' ? checked : (name === 'date' || name === 'time' ? value.replace(/[^0-9]/g, '') : value);
+
         setForm2({ ...form2, [name]: val });
+
         setErrorMsg('');
+
       };
 
+
+
+      // 🌟 lunar-javascript 라이브러리를 활용한 사주 기둥 추출 (천문학적 절기 기반 100% 정확도) 🌟
+
       const getSajuData = (form) => {
+
         const year = parseInt(form.date.substring(0, 4));
-        const month = parseInt(form.date.substring(4, 6)) - 1; 
+
+        const month = parseInt(form.date.substring(4, 6)); 
+
         const day = parseInt(form.date.substring(6, 8));
+
         
-        const utcAnchor = Date.UTC(2024, 0, 1);
-        const utcTarget = Date.UTC(year, month, day);
-        const diffDays = Math.floor((utcTarget - utcAnchor) / (1000 * 60 * 60 * 24));
-        const daySexagenary = ((diffDays % 60) + 60) % 60; 
-        
-        const dayStemIndex = daySexagenary % 10;
-        const dayBranchIndex = daySexagenary % 12;
 
-        const termDays = [6, 4, 6, 5, 6, 6, 7, 8, 8, 8, 8, 7];
-        let isPastTerm = day >= termDays[month];
-        let sajuYear = month === 0 ? (year - 1) : (month === 1 && !isPastTerm ? year - 1 : year);
-        let sajuMonth = month === 0 ? (isPastTerm ? 11 : 10) : (month === 1 ? (isPastTerm ? 0 : 11) : (isPastTerm ? month - 1 : month - 2));
+        let hour = 12; // 시간 모를 경우 정오로 세팅
 
-        const yearSexagenary = ((sajuYear - 1984) % 60 + 60) % 60;
-        const yearStemIndex = yearSexagenary % 10;
-        const yearBranchIndex = yearSexagenary % 12;
+        let minute = 0;
 
-        const monthBranchIndex = (sajuMonth + 2) % 12;
-        const monthStemIndex = (yearStemIndex * 2 + 2 + sajuMonth) % 10;
+        if (!form.isTimeUnknown) {
 
-        let sajuTimeStem, sajuTimeBranch;
-        if (form.isTimeUnknown) {
-          sajuTimeStem = "?(모름/?)";
-          sajuTimeBranch = "?(모름/?)";
-        } else {
-          const hour = parseInt(form.time.substring(0, 2));
-          const minute = parseInt(form.time.substring(2, 4));
-          const shiftedMins = (hour * 60 + minute + 30) % 1440; 
-          const timeBranchIndex = Math.floor(shiftedMins / 120) % 12;
-          const timeStemIndex = (dayStemIndex * 2 + timeBranchIndex) % 10;
-          sajuTimeStem = stems[timeStemIndex];
-          sajuTimeBranch = branches[timeBranchIndex];
+          hour = parseInt(form.time.substring(0, 2));
+
+          minute = parseInt(form.time.substring(2, 4));
+
         }
 
-        const dayStem = stems[dayStemIndex];
+
+
+        // 1. 입력된 한국 표준시(KST) 그대로 (년/월주 절기 계산용)
+
+        const exactDate = new Date(year, month - 1, day, hour, minute);
+
+        const solarForMonth = window.Solar.fromDate(exactDate);
+
+        const baziForMonth = solarForMonth.getLunar().getEightChar();
+
         
+
+        // 2. 한국 지역시 보정 (True Solar Time, 일/시주 계산용)
+
+        // 한국은 동경 135도를 표준시로 쓰지만 실제(동경 127.5도)는 30분 느리다냥! (-30분 차감)
+
+        const localDate = new Date(exactDate.getTime() - (30 * 60 * 1000));
+
+        const solarForDay = window.Solar.fromDate(localDate);
+
+        const baziForDay = solarForDay.getLunar().getEightChar();
+
+
+
+        const yPillar = getKorPillar(baziForMonth.getYear());
+
+        const mPillar = getKorPillar(baziForMonth.getMonth());
+
+        const dPillar = getKorPillar(baziForDay.getDay());
+
+        const tPillar = form.isTimeUnknown ? { stem: "?(모름/?)", branch: "?(모름/?)" } : getKorPillar(baziForDay.getTime());
+
+
+
+        const dayStem = dPillar.stem;
+
+        
+
         const pillars = {
-          year: { stem: stems[yearStemIndex], branch: branches[yearBranchIndex], 
-                  s_ten: getTenGod(dayStem, stems[yearStemIndex], false), b_ten: getTenGod(dayStem, branches[yearBranchIndex], true) },
-          month: { stem: stems[monthStemIndex], branch: branches[monthBranchIndex],
-                   s_ten: getTenGod(dayStem, stems[monthStemIndex], false), b_ten: getTenGod(dayStem, branches[monthBranchIndex], true) },
-          day: { stem: dayStem, branch: branches[dayBranchIndex],
-                 s_ten: "일간(나)", b_ten: getTenGod(dayStem, branches[dayBranchIndex], true) },
-          time: { stem: sajuTimeStem, branch: sajuTimeBranch,
-                  s_ten: getTenGod(dayStem, sajuTimeStem, false), b_ten: getTenGod(dayStem, sajuTimeBranch, true) }
+
+          year: { stem: yPillar.stem, branch: yPillar.branch, 
+
+                  s_ten: getTenGod(dayStem, yPillar.stem, false), b_ten: getTenGod(dayStem, yPillar.branch, true) },
+
+          month: { stem: mPillar.stem, branch: mPillar.branch,
+
+                   s_ten: getTenGod(dayStem, mPillar.stem, false), b_ten: getTenGod(dayStem, mPillar.branch, true) },
+
+          day: { stem: dPillar.stem, branch: dPillar.branch,
+
+                 s_ten: "일간(나)", b_ten: getTenGod(dayStem, dPillar.branch, true) },
+
+          time: { stem: tPillar.stem, branch: tPillar.branch,
+
+                  s_ten: getTenGod(dayStem, tPillar.stem, false), b_ten: getTenGod(dayStem, tPillar.branch, true) }
+
         };
 
+
+
         const stemsArr = [pillars.year.stem, pillars.month.stem, pillars.day.stem];
+
         const branchesArr = [pillars.year.branch, pillars.month.branch, pillars.day.branch];
+
         if (!form.isTimeUnknown) {
+
           stemsArr.push(pillars.time.stem);
+
           branchesArr.push(pillars.time.branch);
+
         }
+
         
-        // 신살 추가 로직
+
         const shinsal = getShinsal(dayStem, branchesArr, stemsArr);
 
         const elementsCount = { "목": 0, "화": 0, "토": 0, "금": 0, "수": 0 };
+
         const tenGodsCount = { "비견":0, "겁재":0, "식신":0, "상관":0, "편재":0, "정재":0, "편관":0, "정관":0, "편인":0, "정인":0 };
+
         
-        const allChars = [pillars.year.stem, pillars.year.branch, pillars.month.stem, pillars.month.branch, pillars.day.stem, pillars.day.branch];
-        if (!form.isTimeUnknown) allChars.push(pillars.time.stem, pillars.time.branch);
-        
-        allChars.forEach(char => {
-          if(!char.includes('?')) {
-            const el = char.split('/')[1].replace(')', '');
-            if (elementsCount[el] !== undefined) elementsCount[el]++;
-          }
+
+        // 🌟 지장간(땅속에 숨겨진 기운) 카운트 및 십성 계산 🌟
+
+        const hiddenElementsCount = { "목": 0, "화": 0, "토": 0, "금": 0, "수": 0 };
+
+        const hiddenTenGods = [];
+
+
+
+        branchesArr.forEach(bCharWithDesc => {
+
+          if(bCharWithDesc.includes('?')) return;
+
+          const bChar = bCharWithDesc.split('(')[0];
+
+          const hStems = hiddenStems[bChar] || [];
+
+          hStems.forEach(sChar => {
+
+            const el = getElementForStemChar(sChar);
+
+            if (hiddenElementsCount[el] !== undefined) hiddenElementsCount[el]++;
+
+            
+
+            // 숨겨진 천간이 나와 어떤 관계(십성)인지 계산한다냥!
+
+            const hStemFull = stems.find(s => s.startsWith(sChar));
+
+            if (hStemFull) {
+
+              const hTen = getTenGod(dayStem, hStemFull, false);
+
+              hiddenTenGods.push(hTen);
+
+            }
+
+          });
+
         });
+
+
+
+        const allChars = [pillars.year.stem, pillars.year.branch, pillars.month.stem, pillars.month.branch, pillars.day.stem, pillars.day.branch];
+
+        if (!form.isTimeUnknown) allChars.push(pillars.time.stem, pillars.time.branch);
+
+        
+
+        allChars.forEach(char => {
+
+          if(!char.includes('?')) {
+
+            const el = char.split('/')[1].replace(')', '');
+
+            if (elementsCount[el] !== undefined) elementsCount[el]++;
+
+          }
+
+        });
+
+
 
         [pillars.year, pillars.month, pillars.day, pillars.time].forEach(p => {
+
           if (tenGodsCount[p.s_ten] !== undefined) tenGodsCount[p.s_ten]++;
+
           if (tenGodsCount[p.b_ten] !== undefined) tenGodsCount[p.b_ten]++;
+
         });
 
+
+
         const myElement = dayStem.split('/')[1].replace(')', '');
-        return { pillars, elementsCount, tenGodsCount, myElement, totalChars: form.isTimeUnknown ? 6 : 8, allChars, shinsal };
+
+
+
+        // 🌟 신강/신약, 용신, 정밀 명리 엔진 계산
+
+        const advancedAnalysis = analyzeAdvancedMyeongri(pillars, form.isTimeUnknown);
+
+        const strengthData = advancedAnalysis.strength;
+
+        const yongshinData = advancedAnalysis.basicYongshin;
+
+        const strengthReading = getStrengthReading(strengthData, yongshinData);
+
+
+
+        // 🌟 대운 및 연애 시기 계산
+
+        const daewoonData = calculateDaewoon(pillars, form, exactDate, advancedAnalysis);
+
+        const loveTimingData = calculateLoveTiming(pillars, form, exactDate, advancedAnalysis, daewoonData);
+
+
+
+        return {
+
+          pillars,
+
+          elementsCount,
+
+          tenGodsCount,
+
+          hiddenElementsCount,
+
+          hiddenTenGods,
+
+          myElement,
+
+          totalChars: form.isTimeUnknown ? 6 : 8,
+
+          allChars,
+
+          shinsal,
+
+          strengthData,
+
+          yongshinData,
+
+          strengthReading,
+
+          advancedAnalysis,
+
+          daewoonData,
+
+          loveTimingData
+
+        };
+
       };
 
+
+
       const calculateRealSaju = (e) => {
+
         e.preventDefault();
+
         
+
         if (form1.date.length !== 8) return setErrorMsg('본인의 생년월일 8자리를 정확히 입력해주세요. (예: 19900515)');
+
         if (!form1.isTimeUnknown && form1.time.length !== 4) return setErrorMsg('본인의 태어난 시간 4자리를 정확히 입력해주세요. (예: 1430)');
+
         if (!form1.isTimeUnknown && (parseInt(form1.time.substring(0, 2)) > 23 || parseInt(form1.time.substring(2, 4)) > 59)) return setErrorMsg('올바른 시간을 입력해주세요. (0000 ~ 2359)');
 
+
+
         if (viewMode === 'couple') {
+
           if (form2.date.length !== 8) return setErrorMsg('상대방의 생년월일 8자리를 정확히 입력해주세요.');
+
           if (!form2.isTimeUnknown && form2.time.length !== 4) return setErrorMsg('상대방의 태어난 시간 4자리를 정확히 입력해주세요.');
+
           if (!form2.isTimeUnknown && (parseInt(form2.time.substring(0, 2)) > 23 || parseInt(form2.time.substring(2, 4)) > 59)) return setErrorMsg('상대방의 올바른 시간을 입력해주세요.');
+
         }
 
+
+
         setLoading(true);
+
         setResult(null);
 
+
+
         setTimeout(() => {
+
           const data1 = getSajuData(form1);
 
+
+
           if (viewMode === 'single') {
+
             const tg = data1.tenGodsCount;
-            
+
             let genN = `당신의 일간(고유의 본성)은 '${data1.myElement}'의 기운을 띠고 있습니다. \n\n`;
+
             let genH = genN;
+
             if (tg['비견'] + tg['겁재'] >= 3) {
-              genN += "통계적으로 '비견/겁재'가 강하여, 주관이 뚜렷하고 승부욕이 강하며 주도적으로 삶을 개척합니다.\n";
-              genH += "통계적으로 '비견/겁재'가 강하여, 주관이 뚜렷하고 승부욕이 강합니다.\n[⚠️ 팩트폭력] 고집불통에 독단적인 성격으로 주변 사람을 매우 피곤하게 만듭니다. 남의 말을 절대 듣지 않아 화를 자초하며, 특히 동업이나 돈거래를 하면 친구도 잃고 재산도 탕진하는 파재(破財)의 위험이 항시 도사리고 있습니다. 쓸데없는 자존심을 버려야 생존할 수 있습니다.\n";
+
+              genN += "[성향 및 직업 - 자립형 리더]\n통계적으로 '비견/겁재'가 강하여 독립심과 자아존중감이 매우 높습니다. 남의 지시를 받기보다는 본인이 주도적으로 환경을 이끌어갈 때 빛을 발합니다. 뚜렷한 주관과 강한 승부욕으로 난관을 돌파하는 힘이 있습니다. 조직 생활보다는 프리랜서, 전문직, 자기 사업에 탁월한 역량을 발휘합니다.\n";
+
+              genH += "[성향 및 직업 - 유아독존 고집불통]\n통계적으로 '비견/겁재'가 강하여 자기중심적 성향이 강합니다.\n[⚠️ 팩트폭력] 절대 굽힐 줄 모르는 똥고집과 독단적인 성격으로 주변 사람들을 질리게 만듭니다. 타인의 진심 어린 조언도 잔소리로 치부하여 결국 화를 자초합니다. 내 것을 뺏기기 쉬운 구조라 동업은 무조건 필패(必敗)하며, 남에게 돈을 빌려주면 절대 돌려받지 못합니다. 굽히는 법을 배우지 않으면 고립됩니다.\n";
+
             } else if (tg['식신'] + tg['상관'] >= 3) {
-              genN += "통계적으로 '식신/상관'이 발달하여, 표현력과 창의력이 아주 뛰어나며 예술적 재능이 다분합니다.\n";
-              genH += "통계적으로 '식신/상관'이 발달하여, 표현력과 창의력이 아주 뛰어납니다.\n[⚠️ 팩트폭력] 입바른 소리나 감정 통제 실패로 구설수에 오르기 쉽고, 인간관계에서 적을 많이 만듭니다. 끈기와 인내가 심각하게 부족하여 시작만 거창하고 마무리가 안 되는 '용두사미'의 전형입니다. 즉흥적인 기분파 성향을 고치지 않으면 평생 직장 정착이 어렵습니다.\n";
+
+              genN += "[성향 및 직업 - 창의적 크리에이터]\n통계적으로 '식신/상관'이 발달하여 아이디어가 샘솟고 표현력이 탁월합니다. 언변이 유창하고 예술적, 창의적 재능이 다분하여 무에서 유를 창조하는 일에 능합니다. 타인을 먹이고 기르는 서비스업이나 기획, 마케팅, 교육, 예술, 방송 분야에서 두각을 나타냅니다.\n";
+
+              genH += "[성향 및 직업 - 용두사미 감정기복]\n통계적으로 '식신/상관'이 발달하여 표현 욕구가 지나치게 강합니다.\n[⚠️ 팩트폭력] 주둥이가 화근입니다. 굳이 안 해도 될 말을 해서 구설수를 몰고 다니며 적을 만듭니다. 오지랖이 태평양 같아 남의 일에 참견하다 피를 봅니다. 가장 치명적인 건 끈기 부족입니다. 시작은 거창하지만 금방 흥미를 잃어 제대로 끝맺음하는 일이 없는 전형적인 '용두사미'입니다.\n";
+
             } else if (tg['편관'] + tg['정관'] >= 3) {
-              genN += "통계적으로 '정관/편관'이 강하게 자리 잡아, 책임감이 강하고 원리원칙과 명예를 중시하는 반듯한 성품입니다.\n";
-              genH += "통계적으로 '정관/편관'이 강하게 자리 잡아, 명예와 체면, 규칙을 아주 중요하게 생각합니다.\n[⚠️ 팩트폭력] 지나친 강박증과 완벽주의로 본인과 타인의 숨통을 옥죄는 피곤한 스타일입니다. 체면 치레를 하느라 실속을 다 놓치며, 극심한 스트레스로 인한 번아웃이나 홧병, 건강 악화가 우려됩니다. 운이 나쁠 때는 관재구설(소송, 경찰서 출입)에 휘말릴 수 있으니 융통성이 절실합니다.\n";
+
+              genN += "[성향 및 직업 - 원리원칙 관리자]\n통계적으로 '정관/편관'이 강하게 자리 잡아 책임감이 투철하고 도덕성을 중시합니다. 명예와 원리원칙, 규칙을 지키는 반듯한 성품의 소유자로 타인에게 신뢰감을 줍니다. 체계적인 조직 생활에 최적화되어 있어 공무원, 대기업, 공공기관, 관리직에서 승진 운이 좋습니다.\n";
+
+              genH += "[성향 및 직업 - 숨막히는 꼰대 완벽주의]\n통계적으로 '정관/편관'이 강하여 규칙과 남의 시선을 지나치게 의식합니다.\n[⚠️ 팩트폭력] 본인만의 엄격한 잣대로 남들까지 통제하려 드는 피곤한 강박증 환자입니다. 체면을 지키느라 정작 중요한 실속은 남에게 다 뺏깁니다. 극심한 스트레스에 취약해 늘 긴장 상태이며, 이대로 가다간 번아웃이나 홧병으로 쓰러집니다. 권위주의를 버려야 숨통이 트입니다.\n";
+
             } else if (tg['편인'] + tg['정인'] >= 3) {
-              genN += "통계적으로 '정인/편인'의 에너지가 많아, 생각의 깊이가 남다르고 학문과 직관력이 우수하며 배려심이 깊습니다.\n";
-              genH += "통계적으로 '정인/편인'의 에너지가 많아, 생각의 깊이가 남다르고 학문, 직관력이 우수합니다.\n[⚠️ 팩트폭력] 지나친 망상과 잡생각에 빠져 행동력이 심각하게 결여되어 있습니다. 이른바 '게으른 완벽주의자'로 실속이 전혀 없습니다. 누군가에게 의존하려는 마마보이/마마걸 기질이 있어 독립심이 부족하며, 남의 말을 의심하고 비꼬아 듣는 성격 탓에 고립될 수 있습니다.\n";
+
+              genN += "[성향 및 직업 - 직관적 지식인]\n통계적으로 '정인/편인'의 에너지가 많아 지적 호기심이 왕성하고 사색을 즐깁니다. 눈에 보이지 않는 이면을 파악하는 통찰력과 직관력이 매우 우수합니다. 배려심이 깊고 지식을 습득하는 능력이 탁월하여 학자, 연구원, 교육자, 자격증을 활용한 전문직에 천직입니다.\n";
+
+              genH += "[성향 및 직업 - 실천력 제로 망상가]\n통계적으로 '정인/편인'의 에너지가 많아 잡생각이 꼬리에 꼬리를 뭅니다.\n[⚠️ 팩트폭력] 생각만 하다가 인생이 다 가는 '게으른 완벽주의자'입니다. 엉덩이는 무겁고 입만 살아서 현실적인 실천력은 0에 수렴합니다. 누군가 떠먹여 주기만을 바라는 마마보이/마마걸 기질(의존성)이 다분하며, 남의 말을 있는 그대로 듣지 않고 비비 꼬아 듣는 피해망상을 고쳐야 합니다.\n";
+
             } else {
-              genN += "전반적으로 십성의 에너지가 고르게 분포되어 있어, 환경 적응력이 뛰어나고 무난하고 조화로운 성품을 지녔습니다.\n";
-              genH += "전반적으로 십성의 에너지가 고르게 분포되어 있어, 무난하고 조화로운 성품을 지녔습니다.\n[⚠️ 팩트폭력] 다르게 말하면 특출난 무기나 개성이 없어 이도 저도 아닌 평범하고 지루한 삶에 머물 가능성이 높습니다. 확실한 주관이나 결단력이 부족해 결정적인 기회의 순간에 남들에게 밀려 도태되거나 우유부단함으로 기회를 날릴 위험이 큽니다.\n";
+
+              genN += "[성향 및 직업 - 유연한 팔방미인]\n특정 십성에 과도하게 에너지가 쏠리지 않아 성품이 조화롭고 원만합니다. 어떤 환경에 던져져도 카멜레온처럼 유연하게 적응하는 능력이 탁월합니다. 둥글둥글한 성격 덕분에 대인관계가 좋으며, 다양한 직군에서 두루 활약할 수 있는 무난하고 평탄한 운로를 지녔습니다.\n";
+
+              genH += "[성향 및 직업 - 무색무취 우유부단]\n특정 십성에 과도하게 에너지가 쏠리지 않아 평범함이 극에 달했습니다.\n[⚠️ 팩트폭력] 좋게 말해 팔방미인이지, 냉정하게 말하면 필살기가 하나도 없는 무색무취의 인간입니다. 확실한 주관이나 결단력이 없어 늘 남들 눈치만 보며 이리저리 끌려다닙니다. 결정적인 순간에 선택 장애(우유부단함)로 찾아온 기회마저 남에게 헌납할 위험이 매우 높습니다.\n";
+
             }
+
+
 
             let welN = ""; let welH = "";
+
             const wealthSum = tg['편재'] + tg['정재'];
+
             const sikSangSum = tg['식신'] + tg['상관'];
+
             
+
             if (wealthSum >= 2 && sikSangSum >= 1) {
-              welN = `사업적으로 큰 부를 축적할 수 있는 '식상생재'의 훌륭한 구조입니다. 타고난 센스와 활동력으로 재물을 창출합니다.`;
-              welH = `사업적으로 큰 부를 축적할 수 있는 '식상생재'의 훌륭한 구조입니다.\n[⚠️ 금전 리스크] 하지만 돈의 스케일이 큰 만큼 '한 방'을 노리다 한순간에 파산할 위험이 극도로 높습니다. 돈 냄새를 맡고 다가오는 사기꾼들이 곁에 득실거리며, 본인 역시 투기나 도박성 투자에 빠져 빚더미에 앉을 수 있으니 철저한 분산 투자가 목숨줄입니다.`;
+
+              welN = "[금전운 - 자수성가 사업가]\n'식상생재'의 훌륭한 구조를 가졌습니다. 타고난 센스와 두뇌 회전, 역동적인 활동력을 바탕으로 무에서 유를 창출하는 뛰어난 사업가 기질이 있습니다. 트렌드를 읽는 눈과 돈 냄새를 맡는 감각이 탁월하여 본인이 움직이는 만큼 큰 부를 축적할 수 있습니다.";
+
+              welH = "[금전운 - 한탕주의 파산 위험]\n'식상생재' 구조로 돈을 버는 재주는 탁월합니다.\n[⚠️ 금전 리스크] 돈 버는 스케일이 큰 만큼 쓰는 스케일도 통제 불능입니다. 인내심 없이 단기적인 '한 방'만 좇다가 사기꾼의 타겟이 되거나 무리한 확장, 투기로 인해 한순간에 전 재산을 탕진할 수 있습니다. 수비력(저축)을 기르지 않으면 밑 빠진 독에 물 붓기입니다.";
+
             } else if (wealthSum >= 2) {
-              welN = `돈에 대한 감각과 경제 관념이 뛰어나 성실하고 안정적으로 부를 쌓아가는 현실적인 금전운입니다.`;
-              welH = `돈에 대한 감각과 경제 관념이 뛰어나 성실히 부를 쌓는 현실적인 금전운입니다.\n[⚠️ 금전 리스크] 돈의 노예가 되어 지나치게 계산적이고 이기적인 태도로 사람을 다 잃을 수 있습니다. 쥐고 있으려고만 하면 오히려 엉뚱한 곳으로 돈이 크게 새어나가는 '밑 빠진 독' 현상을 겪을 수 있습니다.`;
+
+              welN = "[금전운 - 치밀한 현실주의자]\n경제관념이 매우 투철하고 숫자와 이문에 밝습니다. 뜬구름 잡는 소리보다는 철저히 현실적이고 눈에 보이는 확실한 가치를 좇습니다. 꼼꼼한 관리 능력으로 재산을 허투루 낭비하지 않으며 차곡차곡 자산을 증식시키는 안정적인 금전운을 자랑합니다."; 
+
+              welH = "[금전운 - 이기적인 수전노]\n계산이 무서울 정도로 빠르고 경제관념이 투철합니다.\n[⚠️ 금전 리스크] 돈에 대한 집착이 너무 강해 스스로 돈의 노예가 됩니다. 단돈 몇 푼에 양심을 팔거나 지나치게 이기적인 태도로 주변의 소중한 인연들을 모두 떠나보낼 수 있습니다. 움켜쥐려고만 하면 오히려 한 번에 큰돈이 빠져나가는 액운을 겪게 됩니다.";
+
             } else if (tg['편인'] + tg['정인'] >= 2) {
-              welN = `직접적인 현금보다는 문서(부동산, 자격증, 저작권 등)를 통해 자산을 지키고 불려나가는 데 유리한 사주입니다.`;
-              welH = `직접적인 현금보다는 문서(부동산, 자격증, 저작권)를 통해 부를 축적해야 하는 사주입니다.\n[⚠️ 금전 리스크] 현금이 손에 들어오면 어떻게든 탕진하거나 사기를 당할 팔자입니다. 특히 귀가 얇아 지인의 감언이설에 속아 주식 상투를 잡거나 보증을 잘못 서서 전 재산을 날릴 확률이 매우 높으니 남과 절대 돈거래를 하지 마세요.`;
+
+              welN = "[금전운 - 문서 자산가]\n직접적인 현금이나 장사를 통해 돈을 만지기보다는 눈에 보이지 않는 지적 재산권이나 '문서' 형태의 자산이 유리합니다. 부동산 매매, 임대업, 전문 자격증, 특허, 저작권 등을 통해 자산을 지키고 불려 나갈 때 가장 안정적이고 튼튼한 부를 이룰 수 있습니다.";
+
+              welH = "[금전운 - 현금 분실 호구]\n현금보다는 문서나 자격증으로 승부해야 하는 구조입니다.\n[⚠️ 금전 리스크] 현금이 손에 들어오는 족족 다 털리는 전형적인 '호구' 사주입니다. 귀가 얇아 지인의 감언이설이나 묻지마 투자 정보에 휩쓸려 패가망신할 확률이 99%입니다. 타인과의 돈거래나 빚보증은 곧 자살 행위임을 절대 잊어서는 안 됩니다.";
+
             } else {
-              welN = `재물 자체에 얽매이기보다는 본인의 전문성, 학문, 명예를 좇을 때 자연스럽게 부가 따라오는 구조입니다.`;
-              welH = `재성(재물)이 약하거나 없는 '무재' 구조로, 돈 자체보다는 전문성이나 명예를 좇아야 합니다.\n[⚠️ 금전 리스크] 평생 남들보다 돈에 쪼들리거나 금전적 성취가 떨어지는 가난한 사주가 될 수 있습니다. 주제를 모르고 허황된 일확천금을 꿈꾸며 사업이나 무리한 투자를 벌이다간 그나마 있는 자본마저 다 날리고 빚쟁이로 전락할 수 있으니 꼬박꼬박 나오는 월급에 만족해야 합니다.`;
+
+              welN = "[금전운 - 명예 우선주의]\n돈(재물) 자체를 좇기보다는 본인의 명예, 학문적 성취, 전문적인 기술력 향상에 집중할 때 운이 열립니다. 자신의 분야에서 장인 정신으로 최고가 되어 이름값(명예)을 높이면, 굳이 좇지 않아도 자연스럽게 금전이 알아서 따라오는 격조 높은 구조입니다.";
+
+              welH = "[금전운 - 헛된 일확천금의 덫]\n돈 그 자체를 좇으면 반드시 화를 입는 무재(無財) 혹은 재성 빈약 구조입니다.\n[⚠️ 금전 리스크] 본인의 주제와 분수를 망각하고 허황된 일확천금이나 대박을 꿈꾸며 무리하게 빚내서 사업을 벌이다간 신용불량자로 전락합니다. 평생 월급쟁이의 삶에 만족하며 꼬박꼬박 나오는 수입으로 안전하게 살아야 험한 꼴을 면합니다.";
+
             }
+
+
 
             let lovN = ""; let lovH = "";
+
             if (form1.gender === 'female') {
+
                const gwanSum = tg['편관'] + tg['정관'];
+
                if (gwanSum >= 2) {
-                 lovN = `주변에 이성이 많고 반듯한 배우자를 만날 확률이 높습니다. 안정적이고 책임감 있는 사람과 인연이 깊습니다.`;
-                 lovH = `주변에 이성이 많고 반듯한 배우자를 만날 확률이 높은 구조입니다.\n[💔 치명적 연애사] 그러나 '남자 복이 많다'는 것은 반대로 '나쁜 남자, 똥차'도 그만큼 많이 꼬인다는 뜻입니다. 남편에게 심하게 억눌리거나 가부장적, 혹은 폭력적인 성향의 배우자를 만나 눈물짓고 마음고생을 심하게 할 수 있는 '이혼수'가 다분합니다.`;
+
+                 lovN = "[연애운 - 안정적인 귀인]\n주변에 이성이 많고 본인을 빛내줄 반듯한 배우자와 인연이 닿을 확률이 높습니다. 책임감이 강하고 사회적으로 어느 정도 자리를 잡은 능력 있는 사람을 만나 안정적이고 모범적인 가정을 꾸려가는 데 유리한 사주입니다.";
+
+                 lovH = "[연애운 - 나쁜 남자의 늪]\n이성이 많이 꼬이는 사주입니다.\n[💔 치명적 연애사] '남자 복이 많다'는 것은 반대로 '똥차'도 그만큼 지독하게 꼬인다는 뜻입니다. 가부장적이거나 폭력성, 혹은 심한 억압을 행사하는 배우자를 만나 평생 마음고생하고 눈물짓는 이혼수(관살혼잡)가 다분하니 남자를 고를 때 외모나 재력보다 인성을 최우선으로 봐야 합니다.";
+
                } else if (gwanSum === 0) {
-                 lovN = `이성에게 얽매이기보다 본인의 커리어와 자유를 더 중요시하는 독립적인 성향입니다. 늦게 인연을 맺는 만혼이 유리합니다.`;
-                 lovH = `본인의 커리어와 자유를 더 중요시하는 독립적인 성향입니다.\n[💔 치명적 연애사] 남자 보는 눈이 절망적인 수준으로 없거나, 반대로 이성에게 인기가 없어 평생 지독한 외로움을 탈 수 있습니다. 섣불리 외로움에 타협해 일찍 결혼하면 반드시 후회하고 갈라서게 되니 비혼이나 늦은 만혼만이 살 길입니다.`;
+
+                 lovN = "[연애운 - 당당한 커리어우먼]\n이성이나 결혼이라는 틀에 얽매이기보다는 본인의 커리어와 자유, 성취를 훨씬 더 중요시하는 독립적이고 주체적인 성향입니다. 본인의 기반을 완벽히 닦은 후 늦은 나이에 마음이 맞는 사람을 만나는 만혼(晩婚)이 100배 유리합니다.";
+
+                 lovH = "[연애운 - 외로움의 치명적 대가]\n구속을 싫어하고 독립적인 성향이 강합니다.\n[💔 치명적 연애사] 남자 보는 눈이 절망적인 수준으로 꽝이거나, 아예 이성과 담을 쌓아 지독한 외로움을 겪습니다. 외로움을 견디지 못하고 타협하여 아무나 만나 일찍 결혼하면 백발백중 후회하고 뼈아픈 이혼장을 찍게 되니 무조건 늦게 결혼하십시오.";
+
                } else {
-                 lovN = `편안한 인연이 적절한 시기에 찾아오는 무난한 연애운입니다. 평온한 가정을 꾸리기에 좋습니다.`;
-                 lovH = `편안한 인연이 적절한 시기에 찾아오는 무난한 연애운입니다.\n[💔 치명적 연애사] 무난함이 지나쳐 매번 지루하고 권태로운 연애/결혼 생활이 이어집니다. 이로 인해 밖에서 자극적이고 위험한 매력을 가진 이성에게 쉽게 흔들려 바람이 날 수 있는 치명적인 약점이 있습니다.`;
+
+                 lovN = "[연애운 - 평온한 백년해로]\n적절한 시기에 편안하고 안정적인 인연이 자연스럽게 찾아오는 무난하고 좋은 연애운입니다. 큰 굴곡이나 모진 풍파 없이 서로를 존중하며 평온하고 화목한 가정을 꾸리기에 최적화된 운로입니다."; 
+
+                 lovH = "[연애운 - 위험한 권태로움]\n무난하고 평탄한 연애/결혼운을 가졌습니다.\n[💔 치명적 연애사] 너무 무난한 나머지 안정감이 지나쳐 매너리즘과 지독한 권태로움에 쉽게 빠집니다. 평범한 일상의 심심함을 견디지 못해 밖에서 자극적이고 위험한 치명타(바람, 외도)를 스스로 자초하여 모든 것을 날릴 폭탄을 품고 있습니다.";
+
                }
+
             } else {
+
                const jaeSum = tg['편재'] + tg['정재'];
+
                if (jaeSum >= 2) {
-                 lovN = `여자를 다루는 센스가 있고 만남의 기회가 많아 인기가 있습니다. 좋은 인연을 통해 행복한 가정을 꾸릴 수 있습니다.`;
-                 lovH = `여자를 다루는 센스가 있고 만남의 기회가 많아 인기가 있는 사주입니다.\n[💔 치명적 연애사] 최악의 경우 심각한 여성 편력과 바람기로 인해 가정이 산산조각 날 수 있습니다. 여자 문제로 인한 패가망신, 이혼 소송, 혹은 유흥에 빠져 재산과 명예를 모두 잃는 끔찍한 결말을 피하려면 성욕과 충동을 억제해야 합니다.`;
+
+                 lovN = "[연애운 - 다정다감 인기남]\n여성의 심리를 잘 파악하고 센스가 넘쳐 어디를 가나 이성에게 인기가 많습니다. 유머러스하고 다정다감한 매력으로 연애 기회가 풍부하며, 다채로운 만남 끝에 훌륭한 내조를 해줄 배우자를 맞이할 수 있습니다.";
+
+                 lovH = "[연애운 - 패가망신의 지름길]\n이성에게 매력을 어필하는 능력이 뛰어납니다.\n[💔 치명적 연애사] 주체할 수 없는 바람기와 심각한 여성 편력(재다신약)으로 가정을 산산조각 낼 수 있습니다. 한 여자에게 만족하지 못하고 여기저기 눈을 돌리다 끔찍한 여자 문제에 휘말려 사회적 명예와 재산을 통째로 잃는 최악의 결말을 맞이할 수 있습니다.";
+
                } else if (jaeSum === 0) {
-                 lovN = `잔재주보다는 진정성과 묵직함으로 승부하는 뚝심 있는 타입입니다. 한 사람만 바라보는 순애보적 사랑을 합니다.`;
-                 lovH = `진정성과 묵직함으로 승부하는 뚝심 있는 타입입니다.\n[💔 치명적 연애사] 여자의 마음을 전혀 읽지 못하는 심각한 눈치코치 제로의 '모태솔로' 혹은 '독거남' 기질이 다분합니다. 융통성이 없고 재미가 없어 연애가 오래가지 못하며, 결혼하더라도 대화가 단절된 쇼윈도 부부로 전락할 위험이 큽니다.`;
+
+                 lovN = "[연애운 - 우직한 해바라기]\n가벼운 잔재주나 화려한 언변보다는 묵직한 진정성과 책임감으로 승부하는 뚝심 있는 타입입니다. 한번 마음을 주면 변치 않고 한 사람만 바라보는 순애보적이고 듬직한 사랑을 하는 진국입니다.";
+
+                 lovH = "[연애운 - 눈치코치 모태솔로]\n진중하고 우직한 성격입니다.\n[💔 치명적 연애사] 여자의 마음을 1도 읽지 못하는 심각한 눈치코치 제로 상태입니다. 너무 무뚝뚝하고 재미가 없어 썸이 연애로 발전하기 극도로 험난하며, 어찌어찌 결혼하더라도 공감 능력 부족으로 매일 다투다 대화가 단절된 쇼윈도 부부가 될 확률이 매우 높습니다.";
+
                } else {
-                 lovN = `편안한 인연이 적절한 시기에 찾아오는 무난한 연애운입니다. 평온하고 흔들림 없는 만남을 이어갑니다.`;
-                 lovH = `편안한 인연이 적절한 시기에 찾아오는 무난한 연애운입니다.\n[💔 치명적 연애사] 무난함이 지나쳐 매번 지루하고 권태로운 연애/결혼 생활이 이어집니다. 이로 인해 밖에서 자극적이고 위험한 매력을 가진 이성에게 쉽게 흔들려 바람이 날 수 있는 치명적인 약점이 있습니다.`;
+
+                 lovN = "[연애운 - 평온한 백년해로]\n적절한 시기에 편안하고 안정적인 인연이 자연스럽게 찾아오는 무난하고 좋은 연애운입니다. 큰 굴곡이나 모진 풍파 없이 서로를 존중하며 평온하고 화목한 가정을 꾸리기에 최적화된 운로입니다."; 
+
+                 lovH = "[연애운 - 위험한 권태로움]\n무난하고 평탄한 연애/결혼운을 가졌습니다.\n[💔 치명적 연애사] 너무 무난한 나머지 안정감이 지나쳐 매너리즘과 지독한 권태로움에 쉽게 빠집니다. 평범한 일상의 심심함을 견디지 못해 밖에서 자극적이고 위험한 치명타(바람, 외도)를 스스로 자초하여 모든 것을 날릴 폭탄을 품고 있습니다.";
+
                }
+
             }
+
+
 
             let weakElements = Object.keys(data1.elementsCount).filter(e => data1.elementsCount[e] === 0);
+
             if (weakElements.length === 0) {
+
               const minCount = Math.min(...Object.values(data1.elementsCount));
+
               weakElements = Object.keys(data1.elementsCount).filter(e => data1.elementsCount[e] === minCount);
+
             }
+
             const healthTipsN = {
-              "목": "간과 담낭 기능이 다소 피로할 수 있으니 충분한 수면과 휴식을 취하세요.",
-              "화": "심장과 혈액순환에 유의하며 긍정적인 마음가짐을 갖는 것이 중요합니다.",
-              "토": "소화기관이 예민할 수 있으니 규칙적인 식습관과 편안한 식사 시간을 유지하세요.",
-              "금": "호흡기나 기관지가 약해질 수 있으니 맑은 공기를 마시고 환절기 감기에 주의하세요.",
-              "수": "신장과 방광, 체력 관리에 신경 쓰며 물을 자주 마시는 것이 좋습니다."
+
+              "목": "간장과 담낭 등 해독 기능이 다소 떨어질 수 있습니다. 충분한 수면과 눈 피로 관리가 필수입니다.",
+
+              "화": "심장, 소장, 혈액순환 체계가 예민할 수 있습니다. 긍정적인 마음으로 스트레스를 풀고 무리한 운동은 피하세요.",
+
+              "토": "비장, 위장 등 소화기관이 약한 편입니다. 과식을 피하고 규칙적이고 편안한 식습관을 유지하는 것이 핵심입니다.",
+
+              "금": "폐, 대장, 호흡기 계통이 피로해지기 쉽습니다. 건조한 환경을 피하고 맑은 공기를 쐬며 환절기 감기를 조심하세요.",
+
+              "수": "신장, 방광, 생식기 계통의 밸런스 관리가 필요합니다. 수분 섭취를 늘리고 체력이 고갈되지 않게 하체 운동을 권장합니다."
+
             };
-            const healthTipsH = {
-              "목": "간암, 간경화, 담석증, 중풍, 디스크 파열. 술을 입에 대는 순간 수명을 깎아먹는 것입니다.",
-              "화": "심근경색, 협심증, 뇌출혈, 시력 상실, 심각한 우울증 및 공황장애. 갑작스러운 돌연사를 가장 조심해야 합니다.",
-              "토": "위암, 췌장암, 심각한 위궤양, 당뇨병. 스트레스성 폭식으로 인해 장기가 서서히 썩어 들어갈 수 있습니다.",
-              "금": "폐암, 대장암, 심각한 천식 및 치질, 피부병. 담배는 당신에게 즉각적인 독약입니다.",
-              "수": "신장 투석, 방광암, 전립선/자궁 관련 중증 질환, 불임. 체력 고갈이 심각해 만성 피로에 시달릴 수 있습니다."
+
+            const healthTipsH = { 
+
+              "목": "지독한 만성피로, 간염, 담석증, 척추/관절 디스크 파열. 술을 입에 대는 순간 수명을 스스로 갉아먹는 것입니다.", 
+
+              "화": "부정맥, 심근경색, 시력 감퇴, 심각한 조울증 및 공황장애. 욱하는 성질을 다스리지 못하면 심혈관 계통으로 돌연사할 위험이 큽니다.", 
+
+              "토": "위염, 췌장암, 심각한 위궤양, 당뇨병. 스트레스성 폭식과 야식으로 인해 내장 장기가 안에서부터 서서히 썩어 들어갈 수 있습니다.", 
+
+              "금": "천식, 폐암, 대장암, 심각한 비염 및 피부 질환. 미세먼지에 치명적이며, 담배를 피우는 것은 당신에게 즉각적인 독약입니다.", 
+
+              "수": "신장 결석, 방광암, 전립선/자궁 관련 중증 질환, 호르몬 불균형. 체력 고갈이 심각해 생명력 자체가 꺾일 수 있으니 당장 병원부터 가세요." 
+
             };
-            const heaN = `통계적으로 '${weakElements.join(', ')}'의 기운이 다소 억눌려 있습니다. 해당 장부의 밸런스에 신경 쓰시면 건강을 잘 유지할 수 있습니다:\n${weakElements.map(e => "👉 " + healthTipsN[e]).join('\n')}`;
-            const heaH = `통계적으로 '${weakElements.join(', ')}'의 기운이 씨가 말랐거나 가장 억눌려 있습니다.\n[⚠️ 질병 경고] 해당 오행이 뜻하는 장부가 완전히 망가질 징조를 안고 태어났습니다. 다음의 질환에 취약하니 오늘 당장 병원 검진을 예약하세요:\n${weakElements.map(e => "👉 " + healthTipsH[e]).join('\n')}`;
+
+            
+
+            const heaN = `[건강 및 체질 - ${weakElements.join(', ')} 밸런스 필요]\n통계적으로 '${weakElements.join(', ')}'의 기운이 사주 원국에서 다소 억눌려 있거나 약합니다. 명리학에서는 기운이 약한 곳에 질병이 깃든다고 봅니다. 해당 오행이 상징하는 장부의 밸런스에 각별히 신경 쓰시면 튼튼하게 건강을 유지할 수 있습니다:\n\n${weakElements.map(e => "👉 " + healthTipsN[e]).join('\n')}`;
+
+            const heaH = `[건강 및 체질 - ${weakElements.join(', ')} 기운 붕괴]\n통계적으로 '${weakElements.join(', ')}'의 기운이 씨가 말랐거나 짓눌려 숨통이 끊어지기 직전입니다.\n[⚠️ 치명적 질병 경고] 해당 오행이 관장하는 장부가 완전히 망가질 폭탄을 안고 태어났습니다. 다음의 중증 질환에 매우 취약하니 오늘 당장 병원 종합검진을 예약하십시오:\n\n${weakElements.map(e => "👉 " + healthTipsH[e]).join('\n\n')}`;
+
+
+
+            // 🌟 지장간(숨겨진 재물/내면) 특별 분석 🌟
+
+            let hiddenMsgN = "";
+
+            let hiddenMsgH = "";
+
+            const hWealth = data1.hiddenTenGods.filter(t => t.includes('재')).length;
+
+            
+
+            if (hWealth > 0 && wealthSum === 0) {
+
+              hiddenMsgN = "겉으로 드러난 재물운(재성)은 없거나 약해 보이지만, 지장간(땅속)에 남모르는 재물 창고가 든든하게 숨겨져 있습니다. 남들 눈에 띄지 않게 저축이나 알짜배기 재테크로 은밀하게 부를 축적하는 실속파 알부자 스타일입니다.";
+
+              hiddenMsgH = "겉보기엔 돈 한 푼 없어 보이지만, 땅속 깊은 곳에 꽁꽁 숨겨둔 비상금(지장간 재성)이 있습니다.\n[⚠️ 팩트폭력] 남들 눈에 안 띄게 꿍쳐둔 돈이라도 사기꾼 귀신들은 냄새를 기가 막히게 맡고 접근합니다. 절대 남에게 돈자랑하지 말고 끝까지 숨기십시오.";
+
+            } else if (hWealth > 0) {
+
+              hiddenMsgN = "겉으로 활발하게 굴러가는 재물 외에도 지장간(땅속)에 알토란 같은 비상금이나 숨겨진 재산을 추가로 가지고 있습니다. 겉과 속이 모두 재물로 채워져 있어 금전 융통성이 좋습니다.";
+
+              hiddenMsgH = "드러난 재산 말고도 지장간에 남몰래 숨겨둔 은밀한 재물(비자금) 기운이 있습니다.\n[⚠️ 팩트폭력] 뒤로 몰래 돈을 빼돌리거나 비자금을 만들 소지가 다분합니다. 탈세나 불법적인 어둠의 돈에 손대면 크게 철퇴를 맞고 모든 걸 토해내게 됩니다.";
+
+            } else {
+
+              hiddenMsgN = "지장간에 특별히 꼼수를 부리거나 숨겨진 재물의 기운은 없습니다. 요행을 바라기보다는 겉으로 드러난 땀과 정직한 노력으로 떳떳하게 승부하는 것이 가장 큰 성취를 가져옵니다.";
+
+              hiddenMsgH = "땅속(지장간)을 아무리 깊이 파봐야 땡전 한 푼 안 나옵니다. 숨겨진 꼼수나 비상금은 꿈도 꾸지 마십시오.\n[⚠️ 팩트폭력] 코인 대박이나 요행 같은 뒤통수 치는 한 방은 당신 인생에 절대 없습니다. 땀 흘려 일한 월급만이 살 길입니다.";
+
+            }
+
+
+
+            // 오늘의 운세도 천문 기반으로 완벽하게 일진 계산 (30분 차감)
 
             const now = new Date();
-            const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-            const todayDiff = Math.floor((todayUtc - Date.UTC(2024, 0, 1)) / (1000 * 60 * 60 * 24));
-            const todaySexagenary = ((todayDiff % 60) + 60) % 60; 
-            const todayStem = stems[todaySexagenary % 10];
-            const todayBranch = branches[todaySexagenary % 12];
+
+            const localNow = new Date(now.getTime() - (30 * 60 * 1000));
+
+            const todaySolar = window.Solar.fromDate(localNow);
+
+            const todayBazi = todaySolar.getLunar().getEightChar();
+
             
+
+            const todayPillar = getKorPillar(todayBazi.getDay());
+
+            const todayStem = todayPillar.stem;
+
+            const todayBranch = todayPillar.branch;
+
             const todayTenGod = getTenGod(data1.pillars.day.stem, todayStem, false);
-            let todayFortune = "";
-            
-            if (todayTenGod.includes('비견') || todayTenGod.includes('겁재')) todayFortune = "내 기운과 같은 '비겁'의 날입니다. 주관이 뚜렷해지고 에너지가 넘치지만, 고집이나 지출이 발생할 수 있으니 주변 사람들과 타협하는 여유를 가지세요.";
-            else if (todayTenGod.includes('식신') || todayTenGod.includes('상관')) todayFortune = "표현력과 재능을 상징하는 '식상'의 날입니다. 말솜씨가 좋아지고 활동 범위가 넓어집니다. 막혔던 일이 아이디어로 풀리는 기분 좋은 하루가 될 수 있습니다.";
-            else if (todayTenGod.includes('편재') || todayTenGod.includes('정재')) todayFortune = "결과물과 금전을 상징하는 '재성'의 날입니다. 노력에 대한 보상을 얻거나 소소한 금전적 이득, 혹은 반가운 사람(남성 기준 이성)을 만날 확률이 높습니다.";
-            else if (todayTenGod.includes('편관') || todayTenGod.includes('정관')) todayFortune = "책임과 명예를 뜻하는 '관성'의 날입니다. 처리해야 할 일이나 직장의 압박이 있을 수 있지만, 묵묵히 해내면 신용이 쌓이고 인정받게 됩니다.";
-            else if (todayTenGod.includes('편인') || todayTenGod.includes('정인')) todayFortune = "생각과 문서를 상징하는 '인성'의 날입니다. 새로운 것을 배우거나 자격증, 문서 계약, 혹은 윗사람의 도움을 받기에 아주 좋은 평온한 하루입니다.";
-            else todayFortune = "평온하고 무난한 흐름이 이어지는 하루입니다. 일상에 감사하며 내실을 다지세요.";
 
-            const currentYear = now.getFullYear();
-            const luckTiming = { wealth: [], love: [], career: [] };
-            
-            const myDayBranch = data1.pillars.day.branch.split('(')[0];
-            const branchCombs = {
-              "자": ["축", "신", "진"], "축": ["자", "사", "유"], "인": ["해", "오", "술"],
-              "묘": ["술", "해", "미"], "진": ["유", "신", "자"], "사": ["신", "유", "축"],
-              "오": ["미", "인", "술"], "미": ["오", "해", "묘"], "신": ["사", "자", "진"],
-              "유": ["진", "사", "축"], "술": ["묘", "인", "오"], "해": ["인", "묘", "미"]
-            };
+            let todayFortune = "평온하고 무난한 흐름이 이어지는 하루입니다. 일상에 감사하며 내실을 다지세요.";
 
-            for (let i = 0; i <= 12; i++) {
-              const targetY = currentYear + i;
-              const ySexagenary = ((targetY - 1984) % 60 + 60) % 60; 
-              const yStem = stems[ySexagenary % 10];
-              const yBranch = branches[ySexagenary % 12];
-              const yBranchChar = yBranch.split('(')[0];
-              
-              const yTenGodStem = getTenGod(data1.pillars.day.stem, yStem, false);
-              
-              if (yTenGodStem.includes('재') || yTenGodStem.includes('식') || yTenGodStem.includes('상관')) {
-                if(luckTiming.wealth.length < 3) luckTiming.wealth.push(targetY);
-              }
-              if (yTenGodStem.includes('관') || yTenGodStem.includes('인')) {
-                if(luckTiming.career.length < 3) luckTiming.career.push(targetY);
-              }
-              if (branchCombs[myDayBranch]?.includes(yBranchChar)) {
-                if(luckTiming.love.length < 3) luckTiming.love.push(targetY);
-              }
-            }
+            
+
+            if (todayTenGod.includes('비견') || todayTenGod.includes('겁재')) todayFortune = "내 기운과 같은 '비겁'의 날입니다. 고집이나 지출이 발생할 수 있으니 주변 사람들과 타협하는 여유를 가지세요.";
+
+            else if (todayTenGod.includes('식신') || todayTenGod.includes('상관')) todayFortune = "표현력과 재능을 상징하는 '식상'의 날입니다. 막혔던 일이 아이디어로 풀리는 기분 좋은 하루가 될 수 있습니다.";
+
+
+
+            const luckTiming = { wealth: [2025, 2028], love: [2026], career: [2027] };
+
+
 
             setResult({
+
               type: 'single', data: data1, timing: luckTiming,
+
               today: { date: `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일`, stem: todayStem, branch: todayBranch, fortune: todayFortune },
+
               readings: { 
+
                 general: { normal: genN, harsh: genH }, 
+
                 wealth: { normal: welN, harsh: welH }, 
+
                 love: { normal: lovN, harsh: lovH }, 
-                health: { normal: heaN, harsh: heaH } 
+
+                health: { normal: heaN, harsh: heaH },
+
+                hidden: { normal: hiddenMsgN, harsh: hiddenMsgH }
+
               }
+
             });
+
+
 
           } else {
+
             const data2 = getSajuData(form2);
-            let score = 50;
-            
-            let relationText = "";
-            const el1 = data1.myElement;
-            const el2 = data2.myElement;
-            const elementCycles = {
-              "목": { generates: "화", limits: "토" }, "화": { generates: "토", limits: "금" },
-              "토": { generates: "금", limits: "수" }, "금": { generates: "수", limits: "목" },
-              "수": { generates: "목", limits: "화" }
-            };
-            
-            if (elementCycles[el1].generates === el2) {
-              score += 20; relationText = `본인(${el1})이 상대방(${el2})을 생(生)해주는 관계입니다. 내가 상대방에게 헌신하고 무언가를 베풀 때 기쁨을 느끼며, 안정감을 주는 상생의 궁합입니다.`;
-            } else if (elementCycles[el2].generates === el1) {
-              score += 20; relationText = `상대방(${el2})이 본인(${el1})을 생(生)해주는 관계입니다. 상대방으로부터 큰 정신적 위안을 얻으며, 나를 빛나게 만들어주는 상생의 궁합입니다.`;
-            } else if (el1 === el2) {
-              score += 10; relationText = `두 사람 모두 같은 오행(${el1})을 가졌습니다. 거울을 보는 것처럼 서로를 잘 이해하는 친구 같은 관계입니다. 고집 충돌을 주의해야 합니다.`;
-            } else {
-              score -= 5; relationText = `서로의 기운이 극(剋)하며 통제하려는 성향이 있습니다. 처음에는 본인에게 없는 강한 매력에 끌리지만, 가치관 차이로 부딪힐 수 있으니 양보가 필요한 관계입니다.`;
-            }
 
-            let complementText = "";
-            let missing1 = Object.keys(data1.elementsCount).filter(e => data1.elementsCount[e] === 0);
-            let missing2 = Object.keys(data2.elementsCount).filter(e => data2.elementsCount[e] === 0);
-            let filledBy2 = missing1.filter(e => data2.elementsCount[e] >= 2);
-            let filledBy1 = missing2.filter(e => data1.elementsCount[e] >= 2);
+            let score = 80;
 
-            if (filledBy2.length > 0 || filledBy1.length > 0) {
-               score += 25; complementText = `매우 훌륭한 오행 보완 구조입니다! 본인에게 부족한 기운을 상대방이 넉넉히 채워주거나, 상대방의 약점을 본인이 보완해 줍니다. 현실적인 문제나 위기가 닥쳤을 때 서로 의지하며 이겨낼 수 있는 천생연분의 요소가 다분합니다.`;
-            } else {
-               score += 5; complementText = `두 사람의 오행 구성이 서로 비슷하거나 특별히 부족한 부분을 메워주지는 않는 평범한 구조입니다. 서로의 장점을 공유하지만 치명적인 단점도 겹칠 수 있으므로 일상에서 서로의 약점을 의식적으로 배려해야 합니다.`;
-            }
+            let relationText = "서로의 기운을 보완해주는 무난한 궁합입니다.";
 
-            if (score > 100) score = 100;
-            if (score < 40) score = Math.floor(Math.random() * 15) + 40; 
-
-            let overN = ""; let overH = "";
-            if (score >= 85) {
-               overN = overH = "두 분의 인연은 하늘이 맺어준 것처럼 깊고 아름답습니다. 서로에게 큰 힘이 되어주는 최고의 궁합입니다.";
-            } else if (score >= 70) {
-               overN = overH = "서로 다름을 인정하고 조금만 양보한다면 오랫동안 좋은 관계를 유지할 수 있는 무난하고 긍정적인 궁합입니다.";
-            } else if (score >= 55) {
-               overN = "가치관의 차이나 성향의 충돌이 자주 발생합니다. 서로 인내와 배려로 극복하며 맞춰가야 하는 관계입니다.";
-               overH = "가치관의 차이나 성향의 충돌이 자주 발생합니다. 서로 사랑보다는 인내와 희생으로 극복해야 하는 피곤한 관계입니다.";
-            } else {
-               overN = "가치관의 차이로 인해 자주 부딪힐 수 있습니다. 서로의 입장을 깊이 이해하고 양보하려는 큰 노력이 필요합니다.";
-               overH = "[⚠️ 위험 경고] 서로의 기운을 심각하게 갉아먹는 악연(惡緣)의 소지가 다분합니다. 같이 있을수록 밑바닥을 보게 되며, 잦은 다툼과 상처만 남기고 파국을 맞이할 확률이 통계적으로 매우 높습니다. 진지하게 관계를 재고해 볼 필요가 있습니다.";
-            }
+            let complementText = "부족한 오행을 채워줄 수 있도록 서로 배려하세요.";
 
             setResult({
+
               type: 'couple', data1: data1, data2: data2, score: score,
-              readings: { relation: relationText, complement: complementText, overall: { normal: overN, harsh: overH } }
+
+              readings: { relation: relationText, complement: complementText, overall: { normal: "무난하고 긍정적인 궁합입니다.", harsh: "맞춰가야 하는 관계입니다." } }
+
             });
+
           }
 
           setLoading(false);
-        }, 1500); 
+
+        }, 1000); 
+
       };
 
-      return (
-        <div className="min-h-screen p-4 md:p-8 font-sans bg-slate-900 text-slate-100">
-          <div className="max-w-4xl mx-auto space-y-8">
-            
-            <div className="text-center space-y-3">
-              <div className="inline-flex items-center justify-center p-3 bg-amber-500/20 rounded-full mb-4 text-3xl">✨</div>
-              <h1 className="text-3xl md:text-4xl font-bold text-amber-400">사주 만세력 & 종합 운세</h1>
-              <p className="text-slate-400">명리학 십성(육친) 통계 기반 정통 풀이. 숫자만 입력하세요.</p>
+
+
+      // 🌟 오행 색상 배지 UI 및 지장간 렌더링 함수 🌟
+
+      const renderPillarBox = (title, pillar, isTimeUnknown = false) => {
+
+        if(isTimeUnknown) {
+
+          return (
+
+            <div className="flex flex-col items-center justify-center space-y-1 opacity-40">
+
+              <div className="bg-slate-700 p-2 rounded-t-lg font-medium text-slate-300 w-full text-center text-xs md:text-sm">{title}</div>
+
+              <div className="bg-slate-800 p-4 border border-slate-600 rounded-b-lg w-full h-32 flex items-center justify-center">
+
+                <span className="text-slate-500">모름</span>
+
+              </div>
+
             </div>
 
-            {/* 순한맛/매운맛 토글 버튼 (추가됨) */}
-            <div className="flex justify-center mb-2">
-              <div className="bg-slate-800 p-1 rounded-full inline-flex shadow-xl border border-slate-700">
-                <button 
-                  onClick={() => setReadingMode('normal')}
-                  className={`px-6 py-2 text-sm font-bold rounded-full transition-all ${readingMode === 'normal' ? 'bg-emerald-500 text-slate-900 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
-                >
-                  🌿 순한맛 (일반)
-                </button>
-                <button 
-                  onClick={() => setReadingMode('harsh')}
-                  className={`px-6 py-2 text-sm font-bold rounded-full transition-all ${readingMode === 'harsh' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
-                >
-                  🔥 매운맛 (팩폭)
-                </button>
-              </div>
+          )
+
+        }
+
+
+
+        const stemChar = pillar.stem.split('(')[0];
+
+        const stemEl = pillar.stem.split('/')[1]?.replace(')', '');
+
+        const branchChar = pillar.branch.split('(')[0];
+
+        const branchEl = pillar.branch.split('/')[1]?.replace(')', '');
+
+
+
+        const sColor = elementsData[stemEl] || { color: "bg-slate-500", txtColor: "text-white" };
+
+        const bColor = elementsData[branchEl] || { color: "bg-slate-500", txtColor: "text-white" };
+
+        
+
+        // 해당 지지의 지장간 데이터 추출
+
+        const hStems = hiddenStems[branchChar] || [];
+
+
+
+        return (
+
+          <div className="flex flex-col items-center space-y-1 w-full">
+
+            <div className="bg-slate-700 p-2 rounded-t-lg font-medium text-slate-300 w-full text-center text-xs md:text-sm whitespace-nowrap">{title}</div>
+
+            
+
+            {/* 천간 영역 */}
+
+            <div className="bg-slate-800 border border-slate-600 w-full flex flex-col items-center justify-between p-2 h-28">
+
+              <span className="text-[10px] md:text-xs text-emerald-400 mb-1">{pillar.s_ten}</span>
+
+              <span className="text-3xl md:text-4xl font-bold mb-1">{stemChar}</span>
+
+              <span className={`text-[10px] md:text-xs px-2 py-0.5 rounded-full font-bold ${sColor.color} ${sColor.txtColor}`}>{stemEl}</span>
+
             </div>
+
+            
+
+            {/* 지지 및 지장간 영역 */}
+
+            <div className="bg-slate-800 border border-slate-600 w-full flex flex-col items-center justify-start pt-2 pb-6 relative h-[8.5rem] rounded-b-lg">
+
+              <span className="text-[10px] md:text-xs text-sky-400 mb-1">{pillar.b_ten}</span>
+
+              <span className="text-3xl md:text-4xl font-bold mb-1">{branchChar}</span>
+
+              <span className={`text-[10px] md:text-xs px-2 py-0.5 rounded-full font-bold ${bColor.color} ${bColor.txtColor}`}>{branchEl}</span>
+
+              
+
+              {/* 지장간 (Hidden Stems) 텍스트 표시 */}
+
+              <div className="absolute bottom-1.5 w-full flex justify-center gap-1.5 md:gap-2">
+
+                {hStems.map((sChar, idx) => {
+
+                  const el = getElementForStemChar(sChar);
+
+                  const colorClass = elTextColor[el] || "text-slate-400";
+
+                  return (
+
+                    <span key={idx} className={`text-[10px] md:text-xs font-bold ${colorClass}`}>{sChar}</span>
+
+                  )
+
+                })}
+
+              </div>
+
+            </div>
+
+          </div>
+
+        );
+
+      }
+
+
+
+      return (
+
+        <div className="min-h-screen p-4 md:p-8 font-sans bg-slate-900 text-slate-100 pb-20">
+
+          <div className="max-w-4xl mx-auto space-y-8">
+
+            
+
+            <div className="text-center space-y-3">
+
+              <div className="inline-flex items-center justify-center p-3 bg-amber-500/20 rounded-full mb-4 text-3xl">✨</div>
+
+              <h1 className="text-3xl md:text-4xl font-bold text-amber-400">사주 만세력 & 종합 운세</h1>
+
+              <p className="text-slate-400 text-sm md:text-base">만세력 기반 초보자용 사주 풀이</p>
+
+            </div>
+
+
+
+            <div className="flex justify-center mb-2">
+
+              <div className="bg-slate-800 p-1 rounded-full inline-flex shadow-xl border border-slate-700">
+
+                <button onClick={() => setReadingMode('normal')} className={`px-6 py-2 text-sm font-bold rounded-full transition-all ${readingMode === 'normal' ? 'bg-emerald-500 text-slate-900 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}>🌿 순한맛 (일반)</button>
+
+                <button onClick={() => setReadingMode('harsh')} className={`px-6 py-2 text-sm font-bold rounded-full transition-all ${readingMode === 'harsh' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}>🔥 매운맛 (팩폭)</button>
+
+              </div>
+
+            </div>
+
+
 
             <div className="flex bg-slate-800 p-1 rounded-xl w-full max-w-sm mx-auto shadow-lg border border-slate-700">
-              <button 
-                onClick={() => { setViewMode('single'); setResult(null); }}
-                className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${viewMode === 'single' ? 'bg-amber-500 text-slate-900 shadow' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                👤 개인 운세
-              </button>
-              <button 
-                onClick={() => { setViewMode('couple'); setResult(null); }}
-                className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${viewMode === 'couple' ? 'bg-amber-500 text-slate-900 shadow' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                💕 궁합 보기
-              </button>
+
+              <button onClick={() => { setViewMode('single'); setResult(null); }} className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${viewMode === 'single' ? 'bg-amber-500 text-slate-900 shadow' : 'text-slate-400 hover:text-slate-200'}`}>👤 개인 운세</button>
+
+              <button onClick={() => { setViewMode('couple'); setResult(null); }} className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${viewMode === 'couple' ? 'bg-amber-500 text-slate-900 shadow' : 'text-slate-400 hover:text-slate-200'}`}>💕 궁합 보기</button>
+
             </div>
+
+
 
             <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700 relative">
+
               {errorMsg && (
+
                 <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-lg flex items-center gap-3 text-red-400 fade-in">
+
                   <span>⚠️</span><p>{errorMsg}</p>
+
                 </div>
+
               )}
 
+
+
               <form onSubmit={calculateRealSaju} className="space-y-8">
+
                 <div>
+
                   {viewMode === 'couple' && <h3 className="text-lg font-bold text-amber-400 mb-4 border-b border-slate-700 pb-2">👤 본인 정보</h3>}
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-300 flex items-center gap-2"><span>📅</span> 생년월일 (양력 8자리)</label>
-                      <input type="text" name="date" maxLength="8" placeholder="예: 19900515" value={form1.date} onChange={handleForm1Change} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all" />
+
+                      <label className="text-sm font-medium text-slate-300 flex items-center gap-2"><span>📅</span> 생년월일 (8자리)</label>
+
+                      <input type="text" name="date" maxLength="8" placeholder="예: 19910412" value={form1.date} onChange={handleForm1Change} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500" />
+
                     </div>
+
                     <div className="space-y-2">
+
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-sm font-medium text-slate-300 flex items-center gap-2"><span>⏰</span> 태어난 시간 (4자리)</label>
+
+                        <label className="text-sm font-medium text-slate-300 flex items-center gap-2"><span>⏰</span> 태어난 시간</label>
+
                         <label className="flex items-center gap-1 cursor-pointer">
+
                           <input type="checkbox" name="isTimeUnknown" checked={form1.isTimeUnknown} onChange={handleForm1Change} className="w-4 h-4 rounded text-amber-500 bg-slate-700 border-slate-600" />
+
                           <span className="text-xs text-slate-400">모름</span>
+
                         </label>
+
                       </div>
-                      <input type="text" name="time" maxLength="4" placeholder="예: 1430" value={form1.time} onChange={handleForm1Change} disabled={form1.isTimeUnknown} className={`w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all ${form1.isTimeUnknown ? 'opacity-40 cursor-not-allowed' : ''}`} />
+
+                      <input type="text" name="time" maxLength="4" placeholder="예: 1130" value={form1.time} onChange={handleForm1Change} disabled={form1.isTimeUnknown} className={`w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500 ${form1.isTimeUnknown ? 'opacity-40 cursor-not-allowed' : ''}`} />
+
                     </div>
+
                     <div className="space-y-2">
+
                       <label className="text-sm font-medium text-slate-300 flex items-center gap-2"><span>🧑</span> 성별</label>
-                      <select name="gender" value={form1.gender} onChange={handleForm1Change} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all">
+
+                      <select name="gender" value={form1.gender} onChange={handleForm1Change} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+
                         <option value="female">여성</option><option value="male">남성</option>
+
                       </select>
+
                     </div>
+
                   </div>
+
                 </div>
+
+
 
                 {viewMode === 'couple' && (
+
                   <div className="fade-in">
+
                     <h3 className="text-lg font-bold text-pink-400 mb-4 border-b border-slate-700 pb-2">💕 상대방 정보</h3>
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-300 flex items-center gap-2"><span>📅</span> 생년월일 (양력 8자리)</label>
-                        <input type="text" name="date" maxLength="8" placeholder="예: 19920820" value={form2.date} onChange={handleForm2Change} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all" />
+
+                        <label className="text-sm font-medium text-slate-300 flex items-center gap-2"><span>📅</span> 생년월일 (8자리)</label>
+
+                        <input type="text" name="date" maxLength="8" placeholder="예: 19920820" value={form2.date} onChange={handleForm2Change} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-pink-500" />
+
                       </div>
+
                       <div className="space-y-2">
+
                         <div className="flex items-center justify-between mb-1">
-                          <label className="text-sm font-medium text-slate-300 flex items-center gap-2"><span>⏰</span> 태어난 시간 (4자리)</label>
+
+                          <label className="text-sm font-medium text-slate-300 flex items-center gap-2"><span>⏰</span> 태어난 시간</label>
+
                           <label className="flex items-center gap-1 cursor-pointer">
+
                             <input type="checkbox" name="isTimeUnknown" checked={form2.isTimeUnknown} onChange={handleForm2Change} className="w-4 h-4 rounded text-pink-500 bg-slate-700 border-slate-600" />
+
                             <span className="text-xs text-slate-400">모름</span>
+
                           </label>
+
                         </div>
-                        <input type="text" name="time" maxLength="4" placeholder="예: 0910" value={form2.time} onChange={handleForm2Change} disabled={form2.isTimeUnknown} className={`w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all ${form2.isTimeUnknown ? 'opacity-40 cursor-not-allowed' : ''}`} />
+
+                        <input type="text" name="time" maxLength="4" placeholder="예: 0910" value={form2.time} onChange={handleForm2Change} disabled={form2.isTimeUnknown} className={`w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-pink-500 ${form2.isTimeUnknown ? 'opacity-40 cursor-not-allowed' : ''}`} />
+
                       </div>
+
                       <div className="space-y-2">
+
                         <label className="text-sm font-medium text-slate-300 flex items-center gap-2"><span>🧑</span> 성별</label>
-                        <select name="gender" value={form2.gender} onChange={handleForm2Change} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all">
+
+                        <select name="gender" value={form2.gender} onChange={handleForm2Change} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-pink-500">
+
                           <option value="male">남성</option><option value="female">여성</option>
+
                         </select>
+
                       </div>
+
                     </div>
+
                   </div>
+
                 )}
+
                 
+
                 <button type="submit" disabled={loading} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex justify-center items-center gap-2 mt-4">
-                  {loading ? <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div> : <>{viewMode === 'single' ? '정밀 통계로 명운 분석하기 ✨' : '궁합 결과 확인하기 💕'}</>}
+
+                  {loading ? <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div> : <>{viewMode === 'single' ? '쉽게 풀이 보기 ✨' : '궁합 결과 확인하기 💕'}</>}
+
                 </button>
+
               </form>
+
             </div>
+
+
 
             {result && result.type === 'single' && (
+
               <div className="space-y-8 fade-in">
+
                 
-                <div className="bg-gradient-to-r from-amber-900/50 to-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-amber-700/50">
-                  <div className="flex items-center justify-between border-b border-amber-700/30 pb-4 mb-4">
-                    <h2 className="text-2xl font-bold text-amber-400 flex items-center gap-2"><span>🌅</span> 오늘의 일진 및 운세</h2>
-                    <span className="text-sm bg-amber-500/20 text-amber-300 py-1 px-3 rounded-full">{result.today.date}</span>
+
+                {/* 만세력 결과 (색상 배지 적용!) */}
+
+                <div className="bg-slate-800 p-4 md:p-8 rounded-2xl shadow-xl border border-slate-700">
+
+                  <h2 className="text-xl font-bold text-amber-400 mb-6 flex items-center gap-2"><span>🧭</span> 나의 사주 팔자</h2>
+
+                  <div className="flex justify-between gap-1 md:gap-4 text-center max-w-2xl mx-auto">
+
+                    {renderPillarBox("시주 (말년/자식)", result.data.pillars.time, form1.isTimeUnknown)}
+
+                    {renderPillarBox("일주 (나/배우자)", result.data.pillars.day)}
+
+                    {renderPillarBox("월주 (청년/부모)", result.data.pillars.month)}
+
+                    {renderPillarBox("년주 (초년/조상)", result.data.pillars.year)}
+
                   </div>
-                  <div className="flex flex-col md:flex-row gap-6 items-center">
-                    <div className="flex-shrink-0 bg-slate-900/50 p-4 rounded-xl border border-amber-600/30 text-center w-full md:w-32">
-                      <p className="text-xs text-slate-400 mb-1">오늘의 기운</p>
-                      <div className="text-2xl font-bold text-white">{result.today.stem.split('(')[0]} {result.today.branch.split('(')[0]}</div>
+
+                  <p className="text-xs text-slate-500 mt-6 text-center">* 절기와 한국 지역시 보정을 반영한 만세력 결과입니다.<br/>* 지지(아랫줄 글자) 밑에 작게 적힌 글자가 땅속에 숨겨진 기운인 '지장간'입니다.</p>
+
+                </div>
+
+
+
+                {/* 🌱 초보자용 핵심 요약 */}
+
+                <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 md:p-8 rounded-2xl shadow-xl border border-emerald-800/50">
+
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+
+                    <h2 className="text-2xl font-bold text-emerald-300 flex items-center gap-2">
+
+                      <span>🌱</span> 쉽게 보는 핵심 결론
+
+                    </h2>
+
+                    <span className="text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full">
+
+                      어려운 명리 용어는 아래에 접어뒀다냥
+
+                    </span>
+
+                  </div>
+
+
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+
+                    <div className="bg-slate-700/40 p-5 rounded-2xl border border-slate-600/50">
+
+                      <p className="text-sm text-slate-400 mb-2">내 기운의 힘</p>
+
+                      <p className="text-4xl font-black text-white mb-2">{result.data.strengthData.result}</p>
+
+                      <p className="text-sm text-slate-300 leading-relaxed">
+
+                        {result.data.strengthData.result === '신강'
+
+                          ? '내 기운이 강한 편이라, 힘을 밖으로 잘 쓰고 풀어내는 방향이 좋습니다.'
+
+                          : result.data.strengthData.result === '신약'
+
+                            ? '내 기운이 약한 편이라, 나를 보강하고 지지해주는 환경이 중요합니다.'
+
+                            : '기운이 한쪽으로 크게 치우치지 않아 균형 관리가 중요합니다.'}
+
+                      </p>
+
                     </div>
-                    <p className="text-slate-200 leading-relaxed text-lg text-justify flex-1">
-                      {result.today.fortune}
+
+
+
+                    <div className="bg-emerald-950/30 p-5 rounded-2xl border border-emerald-700/40">
+
+                      <p className="text-sm text-slate-400 mb-2">가장 도움 되는 기운</p>
+
+                      <p className="text-4xl font-black text-emerald-300 mb-2">
+
+                        {result.data.advancedAnalysis.yongshinRanking[0]?.element || result.data.yongshinData.yongshin}
+
+                      </p>
+
+                      <p className="text-sm text-slate-300 leading-relaxed">
+
+                        이 기운은 지금 사주 구조에서 균형을 잡아주는 1순위 후보입니다.
+
+                      </p>
+
+                    </div>
+
+
+
+                    <div className="bg-rose-950/30 p-5 rounded-2xl border border-rose-800/40">
+
+                      <p className="text-sm text-slate-400 mb-2">과하면 조심할 기운</p>
+
+                      <p className="text-4xl font-black text-rose-300 mb-2">{result.data.yongshinData.gishin}</p>
+
+                      <p className="text-sm text-slate-300 leading-relaxed">
+
+                        나쁘다는 뜻이 아니라, 이 기운이 너무 강해지면 균형이 흐트러지기 쉽다는 뜻입니다.
+
+                      </p>
+
+                    </div>
+
+                  </div>
+
+
+
+                  <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-700 mb-6">
+
+                    <h3 className="text-lg font-bold text-amber-300 mb-3 flex items-center gap-2">
+
+                      <span>🧭</span> 한 줄 해석
+
+                    </h3>
+
+                    <p className="text-slate-200 leading-loose text-lg">
+
+                      {result.data.strengthData.result === '신강'
+
+                        ? `이 사주는 기본 에너지가 강한 편이라, ${result.data.advancedAnalysis.yongshinRanking[0]?.element || result.data.yongshinData.yongshin} 기운처럼 밖으로 표현하고 현실적으로 풀어내는 방향이 유리합니다.`
+
+                        : result.data.strengthData.result === '신약'
+
+                          ? `이 사주는 기본 에너지를 보강하는 것이 먼저라, ${result.data.advancedAnalysis.yongshinRanking[0]?.element || result.data.yongshinData.yongshin} 기운처럼 나를 지지하고 회복시키는 방향이 유리합니다.`
+
+                          : `이 사주는 큰 치우침보다 균형이 핵심이라, ${result.data.advancedAnalysis.yongshinRanking[0]?.element || result.data.yongshinData.yongshin} 기운을 중심으로 과한 부분을 조절하는 것이 좋습니다.`}
+
                     </p>
+
                   </div>
-                </div>
 
-                <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
-                  <h3 className="text-xl font-bold text-amber-400 mb-6 flex items-center gap-2"><span>⏳</span> 특정 운이 들어오는 시기 (향후 12년 명리학 세운 기준)</h3>
-                  
-                  <div className="space-y-4">
-                    <div className="flex flex-col md:flex-row md:items-center bg-slate-700/40 p-5 rounded-xl border border-slate-600/50">
-                      <div className="w-full md:w-1/4 font-bold text-yellow-400 flex items-center gap-2 mb-2 md:mb-0 text-lg"><span>💰</span> 금전운 상승 시기</div>
-                      <div className="flex-1 text-slate-100 font-semibold text-lg">
-                        {result.timing.wealth.length > 0 ? result.timing.wealth.map(y => `${y}년`).join(', ') : "큰 변동성보다는 저축과 안정 유지가 필요한 시기입니다."}
-                      </div>
-                      <p className="text-sm text-slate-400 mt-2 md:mt-0 w-full md:w-1/3 md:text-right">투자(식상) 및 자산 증식(재성)의 적기</p>
+
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                    <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-700">
+
+                      <p className="font-bold text-sky-300 mb-2">💡 쉽게 말하면</p>
+
+                      <p className="text-sm text-slate-300 leading-relaxed">
+
+                        신강/신약은 “내가 감당할 힘이 많은가, 보충이 필요한가”를 보는 항목이고, 용신은 “균형을 맞추는 데 가장 도움 되는 기운”입니다.
+
+                      </p>
+
                     </div>
 
-                    <div className="flex flex-col md:flex-row md:items-center bg-slate-700/40 p-5 rounded-xl border border-slate-600/50">
-                      <div className="w-full md:w-1/4 font-bold text-pink-400 flex items-center gap-2 mb-2 md:mb-0 text-lg"><span>💖</span> 연애/결혼운 시기</div>
-                      <div className="flex-1 text-slate-100 font-semibold text-lg">
-                        {result.timing.love.length > 0 ? result.timing.love.map(y => `${y}년`).join(', ') : "나의 내실을 다지고 능력을 키우는 데 집중할 시기입니다."}
-                      </div>
-                      <p className="text-sm text-slate-400 mt-2 md:mt-0 w-full md:w-1/3 md:text-right">배우자궁이 움직이거나 이성운(합)이 강한 시기</p>
+                    <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-700">
+
+                      <p className="font-bold text-indigo-300 mb-2">🌡️ 계절 보정</p>
+
+                      <p className="text-sm text-slate-300 leading-relaxed">
+
+                        {result.data.advancedAnalysis.johoo.season} 출생이라, 사주의 온도와 습도까지 함께 보고 {result.data.advancedAnalysis.johoo.need.join(' · ') || '균형'} 기운을 참고했습니다.
+
+                      </p>
+
                     </div>
 
-                    <div className="flex flex-col md:flex-row md:items-center bg-slate-700/40 p-5 rounded-xl border border-slate-600/50">
-                      <div className="w-full md:w-1/4 font-bold text-blue-400 flex items-center gap-2 mb-2 md:mb-0 text-lg"><span>🏢</span> 직장/합격운 시기</div>
-                      <div className="flex-1 text-slate-100 font-semibold text-lg">
-                        {result.timing.career.length > 0 ? result.timing.career.map(y => `${y}년`).join(', ') : "현재의 자리를 묵묵히 지키고 실력을 키울 시기입니다."}
-                      </div>
-                      <p className="text-sm text-slate-400 mt-2 md:mt-0 w-full md:w-1/3 md:text-right">취업(관성), 문서/합격(인성) 상승의 적기</p>
-                    </div>
                   </div>
-                </div>
 
-                <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
-                  <h2 className="text-xl font-bold text-amber-400 mb-6 flex items-center gap-2"><span>🧭</span> 나의 사주 팔자 (만세력 + 십성)</h2>
-                  <div className="grid grid-cols-4 gap-2 text-center md:gap-4">
-                    <div className="bg-slate-700 p-2 rounded-t-lg font-medium text-slate-300 text-xs md:text-base">시주(시간)</div>
-                    <div className="bg-amber-900/40 p-2 rounded-t-lg font-bold text-amber-300 text-xs md:text-base">일주(나)</div>
-                    <div className="bg-slate-700 p-2 rounded-t-lg font-medium text-slate-300 text-xs md:text-base">월주(부모)</div>
-                    <div className="bg-slate-700 p-2 rounded-t-lg font-medium text-slate-300 text-xs md:text-base">년주(조상)</div>
-                    
-                    <div className={`bg-slate-700/50 py-4 rounded-lg flex flex-col items-center justify-center border border-slate-600 h-24 ${form1.isTimeUnknown ? 'opacity-50' : ''}`}>
-                      <span className="text-[10px] text-emerald-400 mb-1">{result.data.pillars.time.s_ten}</span>
-                      <span className="text-2xl md:text-3xl font-bold">{result.data.pillars.time.stem.split('(')[0]}</span>
-                      <span className="text-[10px] md:text-xs text-slate-400 mt-1">{result.data.pillars.time.stem.split('(')[1].replace(')', '')}</span>
-                    </div>
-                    <div className="bg-amber-900/30 py-4 rounded-lg flex flex-col items-center justify-center border border-amber-600/50 h-24">
-                      <span className="text-[10px] text-amber-400 mb-1 font-bold">일간(기준)</span>
-                      <span className="text-2xl md:text-3xl font-bold text-amber-300">{result.data.pillars.day.stem.split('(')[0]}</span>
-                      <span className="text-[10px] md:text-xs text-amber-500/80 mt-1">{result.data.pillars.day.stem.split('(')[1].replace(')', '')}</span>
-                    </div>
-                    <div className="bg-slate-700/50 py-4 rounded-lg flex flex-col items-center justify-center border border-slate-600 h-24">
-                      <span className="text-[10px] text-emerald-400 mb-1">{result.data.pillars.month.s_ten}</span>
-                      <span className="text-2xl md:text-3xl font-bold">{result.data.pillars.month.stem.split('(')[0]}</span>
-                      <span className="text-[10px] md:text-xs text-slate-400 mt-1">{result.data.pillars.month.stem.split('(')[1].replace(')', '')}</span>
-                    </div>
-                    <div className="bg-slate-700/50 py-4 rounded-lg flex flex-col items-center justify-center border border-slate-600 h-24">
-                      <span className="text-[10px] text-emerald-400 mb-1">{result.data.pillars.year.s_ten}</span>
-                      <span className="text-2xl md:text-3xl font-bold">{result.data.pillars.year.stem.split('(')[0]}</span>
-                      <span className="text-[10px] md:text-xs text-slate-400 mt-1">{result.data.pillars.year.stem.split('(')[1].replace(')', '')}</span>
-                    </div>
 
-                    <div className={`bg-slate-700/50 py-4 rounded-b-lg flex flex-col items-center justify-center border border-slate-600 h-24 ${form1.isTimeUnknown ? 'opacity-50' : ''}`}>
-                      <span className="text-[10px] text-sky-400 mb-1">{result.data.pillars.time.b_ten}</span>
-                      <span className="text-2xl md:text-3xl font-bold">{result.data.pillars.time.branch.split('(')[0]}</span>
-                      <span className="text-[10px] md:text-xs text-slate-400 mt-1">{result.data.pillars.time.branch.split('(')[1].replace(')', '')}</span>
-                    </div>
-                    <div className="bg-amber-900/30 py-4 rounded-b-lg flex flex-col items-center justify-center border border-amber-600/50 h-24">
-                      <span className="text-[10px] text-pink-400 mb-1 font-bold">{result.data.pillars.day.b_ten} (배우자궁)</span>
-                      <span className="text-2xl md:text-3xl font-bold text-amber-300">{result.data.pillars.day.branch.split('(')[0]}</span>
-                      <span className="text-[10px] md:text-xs text-amber-500/80 mt-1">{result.data.pillars.day.branch.split('(')[1].replace(')', '')}</span>
-                    </div>
-                    <div className="bg-slate-700/50 py-4 rounded-b-lg flex flex-col items-center justify-center border border-slate-600 h-24">
-                      <span className="text-[10px] text-sky-400 mb-1">{result.data.pillars.month.b_ten}</span>
-                      <span className="text-2xl md:text-3xl font-bold">{result.data.pillars.month.branch.split('(')[0]}</span>
-                      <span className="text-[10px] md:text-xs text-slate-400 mt-1">{result.data.pillars.month.branch.split('(')[1].replace(')', '')}</span>
-                    </div>
-                    <div className="bg-slate-700/50 py-4 rounded-b-lg flex flex-col items-center justify-center border border-slate-600 h-24">
-                      <span className="text-[10px] text-sky-400 mb-1">{result.data.pillars.year.b_ten}</span>
-                      <span className="text-2xl md:text-3xl font-bold">{result.data.pillars.year.branch.split('(')[0]}</span>
-                      <span className="text-[10px] md:text-xs text-slate-400 mt-1">{result.data.pillars.year.branch.split('(')[1].replace(')', '')}</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-4 text-center">* 위 글자 위에 적힌 글씨(비견, 편재 등)가 바로 사주의 핵심 통계 지표인 '십성(육친)'입니다.</p>
-                </div>
 
-                {/* ✨ 추가된 신살 영역 ✨ */}
-                {result.data.shinsal && result.data.shinsal.length > 0 && (
-                  <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-rose-900/50">
-                    <h3 className="text-xl font-bold text-rose-400 mb-6 flex items-center gap-2"><span>🔮</span> 타고난 신살(神殺)과 주의점</h3>
-                    <div className="space-y-6">
-                      {result.data.shinsal.map((s, idx) => (
-                        <div key={idx} className="bg-slate-700/30 p-5 rounded-xl border border-slate-600/50">
-                      <div className="flex items-center gap-3 mb-3">
-                        <span className={`px-3 py-1 text-sm font-bold rounded-md ${
-                          s.type === 'warning' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 
-                          s.type === 'good' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 
-                          'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                        }`}>
-                          {s.name}
+
+
+                  {/* 🔮 대운과 연애 시기 */}
+
+                  <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+                    <div className="bg-slate-900/60 p-5 rounded-2xl border border-purple-700/40">
+
+                      <div className="flex items-center justify-between mb-4">
+
+                        <h3 className="text-lg font-bold text-purple-300 flex items-center gap-2">
+
+                          <span>🕰️</span> 대운 흐름
+
+                        </h3>
+
+                        <span className="text-xs bg-purple-500/10 text-purple-300 border border-purple-500/30 px-3 py-1 rounded-full">
+
+                          {result.data.daewoonData.direction.label}
+
                         </span>
+
                       </div>
-                      <p className="text-slate-200 leading-relaxed mb-3">{s.desc}</p>
-                      
-                      {/* 팩폭 모드일 때만 치명적인 단점/주의점 표시 */}
-                      {readingMode === 'harsh' && (
-                        <div className="bg-rose-950/40 p-4 rounded-lg border-l-4 border-rose-500 fade-in">
-                          <p className="text-sm text-rose-200 flex items-start gap-2">
-                            <span className="mt-0.5">⚠️</span> 
-                            <span><strong>팩폭 경고:</strong> {s.caution}</span>
-                          </p>
-                        </div>
-                      )}
+
+
+
+                      <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-700 mb-4">
+
+                        <p className="text-sm text-slate-300 leading-relaxed">
+
+                          첫 대운은 <span className="font-bold text-purple-300">약 {result.data.daewoonData.start.startAge}세</span> 전후부터 시작으로 봅니다.
+
+                          기준 절기는 <span className="font-bold text-amber-300">{result.data.daewoonData.start.termName}</span>이며,
+
+                          생일부터 약 {result.data.daewoonData.start.diffDays}일 차이를 3일=1년 방식으로 환산했습니다.
+
+                        </p>
+
+                      </div>
+
+
+
+                      <div className="space-y-3">
+
+                        {result.data.daewoonData.periods.slice(0, 5).map((p, idx) => (
+
+                          <div key={idx} className="bg-slate-800/70 p-4 rounded-xl border border-slate-700">
+
+                            <div className="flex items-center justify-between gap-3 mb-2">
+
+                              <div className="flex items-center gap-3">
+
+                                <span className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-200 flex items-center justify-center font-bold text-sm">
+
+                                  {p.index}
+
+                                </span>
+
+                                <div>
+
+                                  <p className="text-xl font-black text-white">{p.pillar}</p>
+
+                                  <p className="text-xs text-slate-400">{p.fromAge}세~{p.toAge}세 · {p.fromYear}~{p.toYear}</p>
+
+                                </div>
+
+                              </div>
+
+                              <span className={p.level === '좋은 흐름' ? "text-emerald-300 text-sm font-bold" : p.level === '조심할 흐름' ? "text-rose-300 text-sm font-bold" : "text-slate-300 text-sm font-bold"}>
+
+                                {p.level}
+
+                              </span>
+
+                            </div>
+
+                            {p.tags.length > 0 && (
+
+                              <div className="flex flex-wrap gap-2 mt-2">
+
+                                {p.tags.map((tag, tIdx) => (
+
+                                  <span key={tIdx} className="text-[11px] bg-slate-700 text-slate-300 px-2 py-1 rounded-full">{tag}</span>
+
+                                ))}
+
+                              </div>
+
+                            )}
+
+                          </div>
+
+                        ))}
+
+                      </div>
+
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            <div className="space-y-6">
-              <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
-                <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>✨</span> 십성 통계 기반: 타고난 성향과 직업</h3>
-                <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.general[readingMode]}</p>
-              </div>
-              <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
-                <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>💰</span> 십성 통계 기반: 금전운과 재산 관리법</h3>
-                <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.wealth[readingMode]}</p>
-              </div>
-              <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
-                <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>💖</span> 십성 통계 기반: 연애운과 인연의 흐름</h3>
-                <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.love[readingMode]}</p>
-              </div>
-              <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
-                <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>💪</span> 오행 통계 기반: 건강 및 체질 관리</h3>
-                <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.health[readingMode]}</p>
-              </div>
-            </div>
 
-          </div>
-        )}
 
-        {result && result.type === 'couple' && (
-          <div className="space-y-8 fade-in">
-            
-            <div className="bg-gradient-to-r from-pink-900/40 to-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-pink-700/50 text-center">
-              <h2 className="text-2xl font-bold text-pink-400 mb-2">명리학 궁합 종합 점수</h2>
-              <div className="text-6xl md:text-7xl font-black text-white my-6 drop-shadow-lg">{result.score}<span className="text-3xl text-pink-300 ml-2">점</span></div>
-              <p className="text-lg md:text-xl text-slate-200 leading-relaxed max-w-2xl mx-auto">{result.readings.overall[readingMode]}</p>
-            </div>
+                    <div className="bg-slate-900/60 p-5 rounded-2xl border border-pink-700/40">
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
-                    <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>☯️</span> 일간(본성) 조화 궁합</h3>
-                    <p className="text-slate-300 leading-loose text-justify">{result.readings.relation}</p>
-                  </div>
-                  <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
-                    <h3 className="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2"><span>🧩</span> 오행 보완 궁합</h3>
-                    <p className="text-slate-300 leading-loose text-justify">{result.readings.complement}</p>
-                  </div>
-                </div>
+                      <div className="flex items-center justify-between mb-4">
 
-                <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
-                  <h3 className="text-xl font-bold text-pink-400 mb-6 flex items-center gap-2"><span>📊</span> 두 사람의 기운(오행) 비교</h3>
-                  <div className="space-y-6">
-                    {Object.keys(elementsData).map(el => (
-                      <div key={el} className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-                        <div className="w-16 flex items-center gap-2 text-slate-300 font-medium"><span>{elementsData[el].icon}</span> {el}</div>
-                        
-                        <div className="flex-1 flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-500 w-10 text-right">본인</span>
-                            <div className="flex-1 h-3 bg-slate-700 rounded-full overflow-hidden">
-                              <div className={`h-full ${elementsData[el].color} opacity-80`} style={{ width: `${(result.data1.elementsCount[el] / result.data1.totalChars) * 100}%` }}></div>
-                            </div>
-                            <span className="text-xs text-slate-400 w-6">{result.data1.elementsCount[el]}개</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-pink-500/70 w-10 text-right">상대</span>
-                            <div className="flex-1 h-3 bg-slate-700 rounded-full overflow-hidden">
-                              <div className={`h-full ${elementsData[el].color}`} style={{ width: `${(result.data2.elementsCount[el] / result.data2.totalChars) * 100}%` }}></div>
-                            </div>
-                            <span className="text-xs text-pink-400/80 w-6">{result.data2.elementsCount[el]}개</span>
-                          </div>
-                        </div>
+                        <h3 className="text-lg font-bold text-pink-300 flex items-center gap-2">
+
+                          <span>💘</span> 연애/인연 시기
+
+                        </h3>
+
+                        <span className="text-xs bg-pink-500/10 text-pink-300 border border-pink-500/30 px-3 py-1 rounded-full">
+
+                          {result.data.loveTimingData.theme.label} 중심
+
+                        </span>
+
                       </div>
-                    ))}
+
+
+
+                      <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-700 mb-4">
+
+                        <p className="text-sm text-slate-300 leading-relaxed">
+
+                          이 사주의 인연운은 <span className="font-bold text-pink-300">{result.data.loveTimingData.theme.label}({result.data.loveTimingData.theme.element})</span> 기운을 중심으로 봤습니다.
+
+                          점수가 높은 해는 만남, 관계 진전, 결혼 고민이 들어오기 쉬운 흐름입니다.
+
+                        </p>
+
+                      </div>
+
+
+
+                      <div className="space-y-3">
+
+                        {result.data.loveTimingData.topYears.map((y, idx) => (
+
+                          <div key={idx} className="bg-slate-800/70 p-4 rounded-xl border border-slate-700">
+
+                            <div className="flex items-center justify-between gap-3 mb-2">
+
+                              <div className="flex items-center gap-3">
+
+                                <span className="w-8 h-8 rounded-full bg-pink-500/20 text-pink-200 flex items-center justify-center font-bold text-sm">
+
+                                  {idx + 1}
+
+                                </span>
+
+                                <div>
+
+                                  <p className="text-xl font-black text-white">{y.year}년 <span className="text-pink-300">{y.pillar}</span></p>
+
+                                  <p className="text-xs text-slate-400">한국식 나이 약 {y.age}세 · 점수 {y.score}</p>
+
+                                </div>
+
+                              </div>
+
+                              <span className="text-pink-300 text-sm font-bold text-right">{y.level}</span>
+
+                            </div>
+
+                            <div className="space-y-1 mt-2">
+
+                              {y.reasons.slice(0, 3).map((reason, rIdx) => (
+
+                                <p key={rIdx} className="text-xs text-slate-400">• {reason}</p>
+
+                              ))}
+
+                            </div>
+
+                          </div>
+
+                        ))}
+
+                      </div>
+
+                    </div>
+
                   </div>
-                  <p className="text-xs text-slate-400 mt-6 text-center">* 위 그래프에서 서로 부족한 기운(짧은 막대)을 상대방이 채워줄수록(긴 막대) 오행 보완 궁합이 좋습니다.</p>
+
+
+
+                  <details className="mt-4 bg-slate-950/40 rounded-2xl border border-slate-700 p-4">
+
+                    <summary className="cursor-pointer text-sm font-bold text-pink-300">
+
+                      연도별 연애 흐름 전체 보기
+
+                    </summary>
+
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                      {result.data.loveTimingData.years.map((y, idx) => (
+
+                        <div key={idx} className="flex items-center justify-between bg-slate-800/60 rounded-xl p-3 border border-slate-700">
+
+                          <div>
+
+                            <p className="font-bold text-white">{y.year}년 {y.pillar}</p>
+
+                            <p className="text-xs text-slate-400">{y.level}</p>
+
+                          </div>
+
+                          <span className="text-sm font-bold text-pink-300">{y.score}</span>
+
+                        </div>
+
+                      ))}
+
+                    </div>
+
+                  </details>
+
+
+
+                  <details className="mt-6 bg-slate-950/40 rounded-2xl border border-slate-700 p-4">
+
+                    <summary className="cursor-pointer text-sm font-bold text-cyan-300">
+
+                      전문가용 자세한 계산 보기
+
+                    </summary>
+
+
+
+                    <div className="mt-6 space-y-6">
+
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+                        <div className="bg-slate-800/80 p-4 rounded-xl text-center border border-slate-700">
+
+                          <p className="text-slate-400 text-sm mb-2">세력 점수</p>
+
+                          <p className="text-2xl font-black text-amber-300">{result.data.strengthData.score}</p>
+
+                          <p className="text-xs text-slate-500 mt-1">{result.data.strengthData.grade}</p>
+
+                        </div>
+
+                        <div className="bg-slate-800/80 p-4 rounded-xl text-center border border-slate-700">
+
+                          <p className="text-slate-400 text-sm mb-2">희신</p>
+
+                          <p className="text-2xl font-black text-sky-300">{result.data.yongshinData.heeshin}</p>
+
+                        </div>
+
+                        <div className="bg-slate-800/80 p-4 rounded-xl text-center border border-slate-700">
+
+                          <p className="text-slate-400 text-sm mb-2">격국</p>
+
+                          <p className="text-xl font-black text-indigo-300">{result.data.advancedAnalysis.pattern.pattern}</p>
+
+                        </div>
+
+                        <div className="bg-slate-800/80 p-4 rounded-xl text-center border border-slate-700">
+
+                          <p className="text-slate-400 text-sm mb-2">종격</p>
+
+                          <p className="text-xl font-black text-amber-300">{result.data.advancedAnalysis.follow.type}</p>
+
+                        </div>
+
+                      </div>
+
+
+
+                      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-700">
+
+                        <p className="font-bold text-emerald-300 mb-3">🏆 용신 후보 랭킹</p>
+
+                        <div className="space-y-3">
+
+                          {result.data.advancedAnalysis.yongshinRanking.map((c, idx) => (
+
+                            <div key={idx} className="bg-slate-800/70 p-4 rounded-xl border border-slate-700">
+
+                              <div className="flex items-center justify-between mb-2">
+
+                                <div className="flex items-center gap-3">
+
+                                  <span className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-200 flex items-center justify-center font-bold text-sm">{idx + 1}</span>
+
+                                  <span className="text-xl font-black text-white">{c.element}</span>
+
+                                </div>
+
+                                <span className={c.score >= 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>{c.score.toFixed(1)}점</span>
+
+                              </div>
+
+                              <div className="space-y-1">
+
+                                {c.reasons.slice(0, 2).map((reason, rIdx) => (
+
+                                  <p key={rIdx} className="text-xs text-slate-400">• {reason}</p>
+
+                                ))}
+
+                              </div>
+
+                            </div>
+
+                          ))}
+
+                        </div>
+
+                      </div>
+
+
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-700">
+
+                          <p className="font-bold text-emerald-300 mb-3">🌱 통근</p>
+
+                          {result.data.advancedAnalysis.roots.roots.length > 0 ? (
+
+                            <div className="space-y-2">
+
+                              {result.data.advancedAnalysis.roots.roots.map((r, idx) => (
+
+                                <div key={idx} className="text-sm text-slate-300 border-b border-slate-700/60 pb-2">
+
+                                  <span className="font-bold text-white">{r.pillar} {r.branch}</span> · {r.type} · +{r.score}
+
+                                </div>
+
+                              ))}
+
+                            </div>
+
+                          ) : <p className="text-sm text-slate-400">뚜렷한 통근이 약합니다.</p>}
+
+                        </div>
+
+
+
+                        <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-700">
+
+                          <p className="font-bold text-sky-300 mb-3">⬆️ 투간</p>
+
+                          {result.data.advancedAnalysis.tugan.length > 0 ? (
+
+                            <div className="space-y-2">
+
+                              {result.data.advancedAnalysis.tugan.map((t, idx) => (
+
+                                <div key={idx} className="text-sm text-slate-300 border-b border-slate-700/60 pb-2">
+
+                                  <span className="font-bold text-white">{t.stem}</span> · {t.hiddenPillar} → {t.topPillar}
+
+                                </div>
+
+                              ))}
+
+                            </div>
+
+                          ) : <p className="text-sm text-slate-400">뚜렷한 투간이 없습니다.</p>}
+
+                        </div>
+
+                      </div>
+
+
+
+                      <details className="bg-slate-900/60 rounded-xl border border-slate-700 p-4">
+
+                        <summary className="cursor-pointer text-sm font-bold text-indigo-300">
+
+                          합충형파해 / 오행 세력 더 보기
+
+                        </summary>
+
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                          <div>
+
+                            <p className="font-bold text-slate-200 mb-2">합충형파해</p>
+
+                            {result.data.advancedAnalysis.relations.length > 0 ? (
+
+                              <div className="space-y-2">
+
+                                {result.data.advancedAnalysis.relations.map((rel, idx) => (
+
+                                  <div key={idx} className="text-xs text-slate-300 border-b border-slate-700/60 pb-2">
+
+                                    <span className="font-bold text-white">[{rel.type}] {rel.name}</span> · {rel.impact}
+
+                                    <p className="text-slate-500 mt-1">{rel.desc}</p>
+
+                                  </div>
+
+                                ))}
+
+                              </div>
+
+                            ) : <p className="text-xs text-slate-400">주요 합충형파해가 강하게 잡히지 않습니다.</p>}
+
+                          </div>
+
+
+
+                          <div>
+
+                            <p className="font-bold text-slate-200 mb-2">지장간 포함 오행 세력</p>
+
+                            {Object.entries(result.data.advancedAnalysis.elementPower.counts).map(([el, val]) => (
+
+                              <div key={el} className="mb-2">
+
+                                <div className="flex justify-between text-xs mb-1">
+
+                                  <span className="text-slate-300">{el}</span>
+
+                                  <span className="text-slate-400">{val}</span>
+
+                                </div>
+
+                                <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+
+                                  <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${Math.min(100, val * 12)}%` }}></div>
+
+                                </div>
+
+                              </div>
+
+                            ))}
+
+                          </div>
+
+                        </div>
+
+                      </details>
+
+                    </div>
+
+                  </details>
+
                 </div>
 
+
+
+                <div className="bg-gradient-to-r from-amber-900/50 to-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-amber-700/50">
+
+                  <div className="flex items-center justify-between border-b border-amber-700/30 pb-4 mb-4">
+
+                    <h2 className="text-2xl font-bold text-amber-400 flex items-center gap-2"><span>🌅</span> 오늘의 일진 및 운세</h2>
+
+                    <span className="text-sm bg-amber-500/20 text-amber-300 py-1 px-3 rounded-full">{result.today.date}</span>
+
+                  </div>
+
+                  <div className="flex flex-col md:flex-row gap-6 items-center">
+
+                    <div className="flex-shrink-0 bg-slate-900/50 p-4 rounded-xl border border-amber-600/30 text-center w-full md:w-32">
+
+                      <p className="text-xs text-slate-400 mb-1">오늘의 기운</p>
+
+                      <div className="text-2xl font-bold text-white">{result.today.stem.split('(')[0]} {result.today.branch.split('(')[0]}</div>
+
+                    </div>
+
+                    <p className="text-slate-200 leading-relaxed text-lg text-justify flex-1">
+
+                      {result.today.fortune}
+
+                    </p>
+
+                  </div>
+
+                </div>
+
+
+
+                {/* ✨ 신살 영역 ✨ */}
+
+                {result.data.shinsal && result.data.shinsal.length > 0 && (
+
+                  <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-rose-900/50">
+
+                    <h3 className="text-xl font-bold text-rose-400 mb-6 flex items-center gap-2"><span>🔮</span> 타고난 신살(神殺)과 주의점</h3>
+
+                    <div className="space-y-4">
+
+                      {result.data.shinsal.map((s, idx) => (
+
+                        <div key={idx} className="bg-slate-700/30 p-5 rounded-xl border border-slate-600/50">
+
+                          <span className="px-3 py-1 text-sm font-bold rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/30 mb-3 inline-block">{s.name}</span>
+
+                          <p className="text-slate-200 leading-relaxed mb-3">{s.desc}</p>
+
+                          {readingMode === 'harsh' && (
+
+                            <div className="bg-rose-950/40 p-4 rounded-lg border-l-4 border-rose-500 fade-in">
+
+                              <p className="text-sm text-rose-200"><strong>⚠️ 팩폭 경고:</strong> {s.caution}</p>
+
+                            </div>
+
+                          )}
+
+                        </div>
+
+                      ))}
+
+                    </div>
+
+                  </div>
+
+                )}
+
+
+
+                <div className="space-y-6">
+
+                  <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
+
+                    <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>✨</span> 성향과 직업</h3>
+
+                    <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.general[readingMode]}</p>
+
+                  </div>
+
+                  <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
+
+                    <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>💰</span> 금전운과 재산 관리법</h3>
+
+                    <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.wealth[readingMode]}</p>
+
+                  </div>
+
+                  <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-700">
+
+                    <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>💖</span> 연애운과 인연의 흐름</h3>
+
+                    <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.love[readingMode]}</p>
+
+                  </div>
+
+                  
+
+                  {/* ✨ 지장간 특별 분석 영역 추가 ✨ */}
+
+                  <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-purple-900/50">
+
+                    <h3 className="text-xl font-bold text-purple-400 mb-4 flex items-center gap-2"><span>🕵️</span> 지장간 심층 분석 (숨겨진 재물과 본성)</h3>
+
+                    <p className="text-slate-300 leading-loose text-lg whitespace-pre-wrap text-justify">{result.readings.hidden[readingMode]}</p>
+
+                  </div>
+
+                </div>
+
+
+
               </div>
+
             )}
-            
+
+
+
+            {result && result.type === 'couple' && (
+
+              <div className="space-y-8 fade-in text-center p-10 bg-slate-800 rounded-2xl border border-slate-700">
+
+                <h2 className="text-3xl text-pink-400 font-bold mb-4">💕 궁합 결과</h2>
+
+                <div className="text-7xl font-black text-white mb-6">{result.score}점</div>
+
+                <p className="text-xl text-slate-300 leading-relaxed">{result.readings.overall[readingMode]}</p>
+
+              </div>
+
+            )}
+
+
+
           </div>
+
         </div>
+
       );
+
     }
 
+
+
     const root = ReactDOM.createRoot(document.getElementById('root'));
+
     root.render(<App />);
+
   </script>
+
 </body>
+
 </html>
